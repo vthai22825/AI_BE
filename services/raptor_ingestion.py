@@ -153,7 +153,7 @@ Nội dung các phần:
         return "Lỗi: Không thể tạo bản tóm tắt toàn cục."
 
 #hàm thực thi raptor
-def raptor_ingest(text: str, document_id: str, workspace_id: str, qdrant_client: QdrantClient)-> dict[str, Any]:
+def raptor_ingest(text: str, document_id: str, session_id: str, qdrant_client: QdrantClient)-> dict[str, Any]:
 
     #chunkings text thành các đoạn
     text_splitter = RecursiveCharacterTextSplitter(
@@ -197,17 +197,17 @@ def raptor_ingest(text: str, document_id: str, workspace_id: str, qdrant_client:
     #lưu vào trong qdrant
     points = []
     for t, vector in zip(chunks, leaf_vectors):
-        points.append(PointStruct(id=str(uuid.uuid4()), vector=vector, payload={"workspace_id": workspace_id, "document_id": document_id, "level": 0, "text_content": t}))
+        points.append(PointStruct(id=str(uuid.uuid4()), vector=vector, payload={"session_id": session_id, "document_id": document_id, "level": 0, "text_content": t}))
         
     for t, vector in zip(parent_texts, parent_vectors):
-        points.append(PointStruct(id=str(uuid.uuid4()), vector=vector, payload={"workspace_id": workspace_id, "document_id": document_id, "level": 1, "text_content": t}))
+        points.append(PointStruct(id=str(uuid.uuid4()), vector=vector, payload={"session_id": session_id, "document_id": document_id, "level": 1, "text_content": t}))
 
     # lưu global summary
     points.append(PointStruct(
         id=str(uuid.uuid4()), 
         vector=global_vector, 
         payload={
-            "workspace_id": workspace_id, 
+            "session_id": session_id, 
             "document_id": document_id, 
             "level": 2, 
             "text_content": global_summary,

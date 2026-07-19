@@ -8,5 +8,5 @@ class DocumentProcessResponse(BaseModel):
     total_parent_node: int
 
 class ChatStreamRequest(BaseModel):
-    workspace_id: str
+    session_id: str
     user_question: str

@@ -32,8 +32,8 @@ app.add_middleware(
 def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    workspace_id: str = Form("ws-001"),
-    document_id: str = Form("doc-001")
+    session_id: str = Form(...),
+    document_id: str = Form(...)
 )-> DocumentProcessResponse:
     try:
         #đọc và trích dẫn file
@@ -48,22 +48,22 @@ def upload_document(
         if not text.strip():
             raise ValueError("file không có chữ")
         
-        #chuyển văn bản thô sau khi lấy được xuống service chạy ngầm
+        # Chạy đồng bộ trực tiếp (chờ xử lý xong mới trả về)
         qdrant_client = get_qdrant_client()
-        background_tasks.add_task(raptor_ingest, text, document_id, workspace_id, qdrant_client)
+        result = raptor_ingest(text, document_id, session_id, qdrant_client)
 
         return DocumentProcessResponse(
-            message=f"Đang xử lý file {file.filename} ngầm",
+            message=f"Đã xử lý file {file.filename} thành công",
             document_id=document_id,
-            total_leaf_nodes=0,
-            total_parent_node=0
+            total_leaf_nodes=result.get("total_leaf_nodes", 0),
+            total_parent_node=result.get("total_parent_nodes", 0)
         )
     except Exception as e:
         logger.error("Lỗi upload: %s", str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/documents/{document_id}/summary", tags=["Document"])
-def get_document_summary(document_id: str, workspace_id: str = "ws-001"):
+def get_document_summary(document_id: str, session_id: str):
     try:
         qdrant_client = get_qdrant_client()
         
@@ -72,7 +72,7 @@ def get_document_summary(document_id: str, workspace_id: str = "ws-001"):
             scroll_filter=Filter(
                 must=[
                     FieldCondition(key="document_id", match=MatchValue(value=document_id)),
-                    FieldCondition(key="workspace_id", match=MatchValue(value=workspace_id)),
+                    FieldCondition(key="session_id", match=MatchValue(value=session_id)),
                     FieldCondition(key="type", match=MatchValue(value="global_summary"))
                 ]
             ),
@@ -102,9 +102,11 @@ async def chat_stream(request: ChatStreamRequest) -> StreamingResponse:
         async def event_generator():
             try:
                 # Gọi hàm rag_query_stream từ file ai_query.py
-                async for token in rag_query_stream(request.user_question, request.workspace_id, qdrant_client):
+                async for token in rag_query_stream(request.user_question, request.session_id, qdrant_client):
                     # Format chuẩn SSE: phải có chữ "data: " và kết thúc bằng "\n\n"
-                    yield f"data: {token}\n\n"
+                    # Xử lý xuống dòng trong token: thay \n bằng \ndata: để giữ đúng chuẩn SSE nhiều dòng
+                    formatted_token = token.replace("\n", "\ndata: ")
+                    yield f"data: {formatted_token}\n\n"
                 
                 # Báo hiệu cho Frontend biết luồng đã kết thúc
                 yield "data: [DONE]\n\n"

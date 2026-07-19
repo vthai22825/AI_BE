@@ -34,12 +34,12 @@ query_embedder = GoogleGenerativeAIEmbeddings(
     output_dimensionality=1536
 )
 
-def _retrieve_from_qdrant(query_vector: list[float], workspace_id: str, qdrant_client: QdrantClient, top_k: int) -> list[str]:
+def _retrieve_from_qdrant(query_vector: list[float], session_id: str, qdrant_client: QdrantClient, top_k: int) -> list[str]:
     """Lấy tài liệu thô từ Qdrant"""
     results = qdrant_client.query_points(
         collection_name=QDRANT_COLLECTION_NAME,
         query=query_vector,
-        query_filter=Filter(must=[FieldCondition(key="workspace_id", match=MatchValue(value=workspace_id))]),
+        query_filter=Filter(must=[FieldCondition(key="session_id", match=MatchValue(value=session_id))]),
         limit=top_k,
         with_payload=True,
     )
@@ -49,7 +49,7 @@ def _retrieve_from_qdrant(query_vector: list[float], workspace_id: str, qdrant_c
 # Hàm _filter_with_local_ai đã bị xóa bỏ để tránh rơi rụng dữ liệu.
 
 
-async def rag_query_stream(user_question: str, workspace_id: str, qdrant_client: QdrantClient, top_k: int = DEFAULT_TOP_K) -> AsyncGenerator[str, None]:
+async def rag_query_stream(user_question: str, session_id: str, qdrant_client: QdrantClient, top_k: int = DEFAULT_TOP_K) -> AsyncGenerator[str, None]:
     
     if not GITHUB_API_KEY:
         yield "Lỗi Backend: Chưa cấu hình GITHUB_API_KEY trong file config."
@@ -64,7 +64,7 @@ async def rag_query_stream(user_question: str, workspace_id: str, qdrant_client:
     
     # Bước 2: Truy xuất diện rộng từ Qdrant (Lấy dư ra +5 tài liệu để Local AI có nhiều nguyên liệu lọc)
     fetch_k = top_k + 5 
-    best_texts = _retrieve_from_qdrant(query_vector, workspace_id, qdrant_client, fetch_k)
+    best_texts = _retrieve_from_qdrant(query_vector, session_id, qdrant_client, fetch_k)
     
     if not best_texts:
         yield "Không tìm thấy tài liệu nào liên quan trong hệ thống lưu trữ."
