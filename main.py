@@ -38,19 +38,24 @@ def upload_document(
     try:
         #đọc và trích dẫn file
         content = file.file.read()
-        text = ""
+        pages = []
         if file.filename and file.filename.lower().endswith(".pdf"):
             pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
-            extracted = [page.extract_text() for page in pdf_reader.pages if page.extract_text()]
-            text = "\n\n".join(extracted)
+            for i, page in enumerate(pdf_reader.pages):
+                extracted_text = page.extract_text()
+                if extracted_text:
+                    pages.append({"page_number": i + 1, "text": extracted_text})
         else: 
             text = content.decode("utf-8")
-        if not text.strip():
+            if text.strip():
+                pages.append({"page_number": 1, "text": text})
+                
+        if not pages:
             raise ValueError("file không có chữ")
         
         # Chạy đồng bộ trực tiếp (chờ xử lý xong mới trả về)
         qdrant_client = get_qdrant_client()
-        result = raptor_ingest(text, document_id, session_id, qdrant_client)
+        result = raptor_ingest(pages, document_id, session_id, qdrant_client)
 
         return DocumentProcessResponse(
             message=f"Đã xử lý file {file.filename} thành công",
@@ -84,10 +89,39 @@ def get_document_summary(document_id: str, session_id: str):
             return {"status": "processing", "message": "Tài liệu đang được tóm tắt hoặc chưa hoàn thành."}
             
         summary_text = points[0].payload.get("text_content", "")
-        return {"status": "success", "summary": summary_text}
+        cited_pages = points[0].payload.get("cited_pages", [])
+        return {"status": "success", "summary": summary_text, "cited_pages": cited_pages}
         
     except Exception as e:
         logger.error(f"Lỗi khi lấy summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/documents/{document_id}/pages/{page_number}", tags=["Document"])
+def get_document_page(document_id: str, page_number: int, session_id: str):
+    try:
+        qdrant_client = get_qdrant_client()
+        results = qdrant_client.scroll(
+            collection_name=QDRANT_COLLECTION_NAME,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(key="session_id", match=MatchValue(value=session_id)),
+                    FieldCondition(key="page_number", match=MatchValue(value=page_number)),
+                    FieldCondition(key="level", match=MatchValue(value=0))
+                ]
+            ),
+            limit=50
+        )
+        
+        points = results[0]
+        if not points:
+            return {"page_number": page_number, "text": "Không tìm thấy nội dung cho trang này."}
+            
+        # Gộp tất cả các chunk thuộc trang này
+        text = "\n\n".join([p.payload.get("text_content", "") for p in points])
+        return {"page_number": page_number, "text": text}
+        
+    except Exception as e:
+        logger.error(f"Lỗi khi lấy nội dung trang {page_number}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/chat/stream", tags=["Chat"])
