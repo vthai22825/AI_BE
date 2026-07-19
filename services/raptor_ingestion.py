@@ -61,10 +61,11 @@ def _cluter_vertor(vectors: list[list[float]])-> np.ndarray:
     kmeans = KMeans(n_clusters=effective_clusters, random_state=42, n_init="auto")
     return kmeans.fit_predict(np.array(vectors))
 
-#hàm summarise
-def _summarize_cluster(texts_in_cluster: list[str]) -> str:
-    # Gộp văn bản (để nguyên độ dài vì đã chia nhỏ từ trước)
-    combined_text = "\n---\n".join(texts_in_cluster)
+def _summarize_cluster(items_in_cluster: list[dict]) -> str:
+    # Gộp văn bản kèm theo thông tin trang
+    combined_text = ""
+    for item in items_in_cluster:
+        combined_text += f"\n--- Trang {item['page_number']} ---\n{item['text']}"
 
     prompt = f"""Bạn là một chuyên gia tổng hợp thông tin. Nhiệm vụ của bạn là đọc các đoạn trích dưới đây và viết một bản tóm tắt toàn diện nhưng súc tích.
     
@@ -72,6 +73,9 @@ YÊU CẦU QUAN TRỌNG:
 1. Giữ lại tất cả các từ khóa, định nghĩa, thực thể (tên riêng, địa điểm, số liệu) và các khái niệm cốt lõi.
 2. Trình bày rõ ràng mối liên hệ giữa các ý chính để nội dung có thể được dùng làm tài liệu tra cứu (RAG).
 3. Không thêm thắt thông tin bên ngoài, chỉ dựa vào văn bản được cung cấp.
+4. TRÍCH DẪN TẠI CHỖ (INLINE CITATIONS): Khi bạn tóm tắt một ý hoặc một đoạn, BẮT BUỘC phải chèn một liên kết markdown trích dẫn nguồn trang ngay tại dòng đó (ở cuối câu hoặc đoạn). 
+Cú pháp trích dẫn BẮT BUỘC: `[Trang X](#page-X)` hoặc `[Trang X, Trang Y](#page-X)`
+Ví dụ: "Hệ thống hỗ trợ tâm lý rất quan trọng đối với Thẩm phán [Trang 10](#page-10)."
 
 Văn bản cần tóm tắt:
 {combined_text}"""
@@ -96,17 +100,24 @@ Văn bản cần tóm tắt:
         return "Lỗi: Không thể tóm tắt đoạn văn bản này bằng AI nội bộ."
 
 
-def _generate_global_summary(parent_texts: list[str]) -> str:
+def _generate_global_summary(parent_texts: list[str], parent_cited_pages: list[list[int]]) -> str:
     """Tóm tắt lại toàn bộ các parent_texts thành một Global Summary"""
-    combined_text = "\n---\n".join(parent_texts)
+    combined_text = ""
+    for text, pages in zip(parent_texts, parent_cited_pages):
+        # Tạo chuỗi "Trang 1, 2" hoặc "N/A"
+        pages_str = ", ".join(map(str, pages)) if pages else "N/A"
+        combined_text += f"\n--- Nguồn từ các trang: {pages_str} ---\n{text}"
     
     prompt = f"""Bạn là một chuyên gia tổng hợp tài liệu cấp cao.
-Dưới đây là các bản tóm tắt của từng phần trong một tài liệu. Nhiệm vụ của bạn là gộp chúng lại và viết một BẢN TÓM TẮT TOÀN CỤC bao quát toàn bộ tài liệu.
+Dưới đây là các bản tóm tắt của từng phần trong một tài liệu (có kèm số trang). Nhiệm vụ của bạn là gộp chúng lại và viết một BẢN TÓM TẮT TOÀN CỤC bao quát toàn bộ tài liệu.
 
 YÊU CẦU NGHIÊM NGẶT:
-1. TUYỆT ĐỐI TRUNG THÀNH VỚI VĂN BẢN: Không được tự ý sáng tạo, không chèn thêm bất kỳ tên công cụ (như eslint, prettier...), công nghệ, hay kiến thức cá nhân nào không xuất hiện trong nội dung được cung cấp.
-2. BẢO TOÀN THUẬT NGỮ: Không được khái quát hóa các danh sách quan trọng. (Ví dụ: Nếu văn bản gốc liệt kê cụ thể XSS, SQL Injection, IDOR... thì phải giữ nguyên tên của chúng, không được gộp chung thành "các lỗi bảo mật").
-3. Trình bày cấu trúc rõ ràng (Sử dụng tiêu đề, danh sách gạch đầu dòng, bảng biểu nếu cần).
+1. TUYỆT ĐỐI TRUNG THÀNH VỚI VĂN BẢN: Không được tự ý sáng tạo, không chèn thêm bất kỳ kiến thức cá nhân nào.
+2. BẢO TOÀN THUẬT NGỮ: Không được khái quát hóa các danh sách quan trọng.
+3. TRÍCH DẪN TẠI CHỖ (INLINE CITATIONS): Khi bạn tóm tắt một ý hoặc một đoạn, BẮT BUỘC phải chèn một liên kết markdown trích dẫn nguồn trang ngay tại dòng đó (ở cuối câu hoặc đoạn). 
+Cú pháp trích dẫn BẮT BUỘC: `[Trang X](#page-X)` hoặc `[Trang X, Trang Y](#page-X)`
+Ví dụ: "Hệ thống hỗ trợ tâm lý rất quan trọng đối với Thẩm phán [Trang 10](#page-10)."
+4. Trình bày cấu trúc rõ ràng (Sử dụng tiêu đề, danh sách gạch đầu dòng, bảng biểu nếu cần).
 
 Nội dung các phần:
 {combined_text}"""
@@ -153,17 +164,26 @@ Nội dung các phần:
         return "Lỗi: Không thể tạo bản tóm tắt toàn cục."
 
 #hàm thực thi raptor
-def raptor_ingest(text: str, document_id: str, session_id: str, qdrant_client: QdrantClient)-> dict[str, Any]:
+def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_client: QdrantClient)-> dict[str, Any]:
+
+    from langchain_core.documents import Document
+    docs = []
+    for page in pages:
+        docs.append(Document(page_content=page["text"], metadata={"page_number": page["page_number"]}))
 
     #chunkings text thành các đoạn
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size = CHUNK_SIZE,
         chunk_overlap = CHUNK_OVERLAP
     )
-    chunks = text_splitter.split_text(text)
+    chunk_docs = text_splitter.split_documents(docs)
 
-    if not chunks:
+    if not chunk_docs:
         raise ValueError("Lỗi khi phân tách đoạn văn bản, không tạo được chunks")
+    
+    leaf_ids = [str(uuid.uuid4()) for _ in chunk_docs]
+    chunks = [doc.page_content for doc in chunk_docs]
+    page_numbers = [doc.metadata.get("page_number", "N/A") for doc in chunk_docs]
     
     #khởi tạo collection qdrant
     ensure_collection_exists(qdrant_client)
@@ -175,34 +195,66 @@ def raptor_ingest(text: str, document_id: str, session_id: str, qdrant_client: Q
     #clustering và tạo nút cha
     labels = _cluter_vertor(leaf_vectors)
 
-    cluster_map: dict[int, list[str]] = {}
+    cluster_map: dict[int, list[dict]] = {}
     for idx, label in enumerate(labels):
-        cluster_map.setdefault(int(label), []).append(chunks[idx])
+        cluster_map.setdefault(int(label), []).append({
+            "text": chunks[idx],
+            "leaf_id": leaf_ids[idx],
+            "page_number": page_numbers[idx]
+        })
     
     #summarize nút cha
     parent_texts = []
+    parent_leaf_ids = []
+    parent_cited_pages = []
     
-    for cluster_id, texts in sorted(cluster_map.items()):
-        summary = _summarize_cluster(texts)
+    for cluster_id, items in sorted(cluster_map.items()):
+        summary = _summarize_cluster(items)
         parent_texts.append(summary)
-        # đã xóa time.sleep(2) để tăng tốc độ
+        
+        parent_leaf_ids.append([item["leaf_id"] for item in items])
+        # Lọc unique page_numbers (loại bỏ N/A)
+        pages = list(set([item["page_number"] for item in items if item["page_number"] != "N/A"]))
+        parent_cited_pages.append(pages)
     
     #embedding nút cha
     parent_vectors = _embed_texts(parent_texts)
 
     #tạo global summary (level 2)
-    global_summary = _generate_global_summary(parent_texts)
+    global_summary = _generate_global_summary(parent_texts, parent_cited_pages)
     global_vector = _embed_texts([global_summary])[0]
 
     #lưu vào trong qdrant
     points = []
-    for t, vector in zip(chunks, leaf_vectors):
-        points.append(PointStruct(id=str(uuid.uuid4()), vector=vector, payload={"session_id": session_id, "document_id": document_id, "level": 0, "text_content": t}))
+    for chunk, leaf_id, vector, page_num in zip(chunks, leaf_ids, leaf_vectors, page_numbers):
+        points.append(PointStruct(
+            id=leaf_id, 
+            vector=vector, 
+            payload={
+                "session_id": session_id, 
+                "document_id": document_id, 
+                "level": 0, 
+                "text_content": chunk,
+                "page_number": page_num
+            }
+        ))
         
-    for t, vector in zip(parent_texts, parent_vectors):
-        points.append(PointStruct(id=str(uuid.uuid4()), vector=vector, payload={"session_id": session_id, "document_id": document_id, "level": 1, "text_content": t}))
+    for p_text, p_vector, p_leaf_ids, p_pages in zip(parent_texts, parent_vectors, parent_leaf_ids, parent_cited_pages):
+        points.append(PointStruct(
+            id=str(uuid.uuid4()), 
+            vector=p_vector, 
+            payload={
+                "session_id": session_id, 
+                "document_id": document_id, 
+                "level": 1, 
+                "text_content": p_text,
+                "leaf_ids": p_leaf_ids,
+                "cited_pages": p_pages
+            }
+        ))
 
     # lưu global summary
+    all_pages = list(set([p for p in page_numbers if p != "N/A"]))
     points.append(PointStruct(
         id=str(uuid.uuid4()), 
         vector=global_vector, 
@@ -211,7 +263,8 @@ def raptor_ingest(text: str, document_id: str, session_id: str, qdrant_client: Q
             "document_id": document_id, 
             "level": 2, 
             "text_content": global_summary,
-            "type": "global_summary"
+            "type": "global_summary",
+            "cited_pages": all_pages
         }
     ))
 
