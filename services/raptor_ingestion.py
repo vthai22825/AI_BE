@@ -70,24 +70,49 @@ def _summarize_cluster(items_in_cluster: list[dict]) -> str:
     prompt = f"""Bạn là một chuyên gia tổng hợp thông tin. Nhiệm vụ của bạn là đọc các đoạn trích dưới đây và viết một bản tóm tắt toàn diện nhưng súc tích.
     
 YÊU CẦU QUAN TRỌNG:
-1. Giữ lại tất cả các từ khóa, định nghĩa, thực thể (tên riêng, địa điểm, số liệu) và các khái niệm cốt lõi.
-2. Trình bày rõ ràng mối liên hệ giữa các ý chính để nội dung có thể được dùng làm tài liệu tra cứu (RAG).
-3. Không thêm thắt thông tin bên ngoài, chỉ dựa vào văn bản được cung cấp.
-4. TRÍCH DẪN TẠI CHỖ (INLINE CITATIONS): Khi bạn tóm tắt một ý hoặc một đoạn, BẮT BUỘC phải chèn một liên kết markdown trích dẫn nguồn trang ngay tại dòng đó (ở cuối câu hoặc đoạn). 
-Cú pháp trích dẫn BẮT BUỘC: `[Trang X](#page-X)` hoặc `[Trang X, Trang Y](#page-X)`
+1. Giữ lại tất cả các từ khóa, định nghĩa, thực thể và các khái niệm cốt lõi.
+2. Không thêm thắt thông tin bên ngoài, chỉ dựa vào văn bản được cung cấp.
+3. TRÍCH DẪN SỐ TRANG CHÍNH XÁC (INLINE CITATIONS): BẮT BUỘC chèn liên kết markdown trích dẫn số trang ở cuối MỖI ý bạn tóm tắt. 
+   - Số trang PHẢI ĐƯỢC LẤY CHÍNH XÁC từ thẻ `--- Trang X ---` tương ứng với nội dung đó. 
+   - Mỗi ý tóm tắt BẮT BUỘC CHỈ ĐƯỢC LẤY TỪ MỘT TRANG DUY NHẤT. Tuyệt đối không được gộp kiến thức của Trang A và Trang B vào chung một ý.
+   - Nếu kiến thức nằm ở `--- Trang 5 ---`, bạn BẮT BUỘC chèn `[Trang 5](#page-5)`. Không được phép mượn kiến thức trang 5 mà lại dán nhãn trang 1.
+Cú pháp trích dẫn BẮT BUỘC: `[Trang X](#page-X)`
 Ví dụ: "Hệ thống hỗ trợ tâm lý rất quan trọng đối với Thẩm phán [Trang 10](#page-10)."
 
 Văn bản cần tóm tắt:
 {combined_text}"""
     
     try:
+        from langchain_openai import ChatOpenAI
+        import time
+        
+        # Thử sử dụng các Cloud Models trước (GPT-4o, Claude...) để tuân thủ prompt tốt hơn
+        if GITHUB_API_KEY:
+            for model_name in GITHUB_FALLBACK_MODELS:
+                try:
+                    logger.info("Đang sinh Local Summary bằng Cloud AI: %s...", model_name)
+                    llm = ChatOpenAI(
+                        model=model_name,
+                        api_key=GITHUB_API_KEY,
+                        base_url=GITHUB_BASE_URL,
+                        temperature=0.0, # Hạ nhiệt độ xuống 0.0 để tránh ảo giác
+                        max_retries=0
+                    )
+                    response = llm.invoke(prompt)
+                    return response.content.strip()
+                except Exception as e:
+                    logger.warning("Truy xuất qua %s thất bại: %s. Kích hoạt model dự phòng...", model_name, e)
+                    time.sleep(1)
+            
+            logger.warning("Đã thử toàn bộ Cloud Models nhưng đều thất bại. Quay về dùng Local AI.")
+            
         from langchain_ollama import ChatOllama
         
         logger.info(f"Đang tóm tắt bằng OLLAMA model: {OLLAMA_SUMMARY_MODEL}")
         
         llm = ChatOllama(
             model=OLLAMA_SUMMARY_MODEL, 
-            temperature=0.3,      
+            temperature=0.1, # Giảm temperature của Ollama xuống cực thấp để ép tuân thủ
             num_predict=2048,      
             timeout=120.0,         
         )
@@ -96,30 +121,29 @@ Văn bản cần tóm tắt:
         return response.content.strip()
     
     except Exception as e:
-        logger.error(f"Ollama ({OLLAMA_SUMMARY_MODEL}) gặp lỗi khi tóm tắt: {e}")
-        return "Lỗi: Không thể tóm tắt đoạn văn bản này bằng AI nội bộ."
+        logger.error(f"Lỗi khi sinh Local Summary: {e}")
+        return "Lỗi: Không thể tóm tắt đoạn văn bản này."
 
 
 def _generate_global_summary(parent_texts: list[str], parent_cited_pages: list[list[int]]) -> str:
     """Tóm tắt lại toàn bộ các parent_texts thành một Global Summary"""
     combined_text = ""
-    for text, pages in zip(parent_texts, parent_cited_pages):
-        # Tạo chuỗi "Trang 1, 2" hoặc "N/A"
-        pages_str = ", ".join(map(str, pages)) if pages else "N/A"
-        combined_text += f"\n--- Nguồn từ các trang: {pages_str} ---\n{text}"
+    for idx, text in enumerate(parent_texts):
+        combined_text += f"\n--- Đoạn tóm tắt {idx + 1} ---\n{text}\n"
     
     prompt = f"""Bạn là một chuyên gia tổng hợp tài liệu cấp cao.
-Dưới đây là các bản tóm tắt của từng phần trong một tài liệu (có kèm số trang). Nhiệm vụ của bạn là gộp chúng lại và viết một BẢN TÓM TẮT TOÀN CỤC bao quát toàn bộ tài liệu.
+Dưới đây là các đoạn tóm tắt từ nhiều phần của một tài liệu. Trong các đoạn tóm tắt này ĐÃ CÓ SẴN các thẻ trích dẫn số trang (ví dụ: `[Trang X](#page-X)`). 
+Nhiệm vụ của bạn là gộp chúng lại thành một BẢN TÓM TẮT TOÀN CỤC bao quát toàn bộ tài liệu.
 
 YÊU CẦU NGHIÊM NGẶT:
-1. TUYỆT ĐỐI TRUNG THÀNH VỚI VĂN BẢN: Không được tự ý sáng tạo, không chèn thêm bất kỳ kiến thức cá nhân nào.
-2. BẢO TOÀN THUẬT NGỮ: Không được khái quát hóa các danh sách quan trọng.
-3. TRÍCH DẪN TẠI CHỖ (INLINE CITATIONS): Khi bạn tóm tắt một ý hoặc một đoạn, BẮT BUỘC phải chèn một liên kết markdown trích dẫn nguồn trang ngay tại dòng đó (ở cuối câu hoặc đoạn). 
-Cú pháp trích dẫn BẮT BUỘC: `[Trang X](#page-X)` hoặc `[Trang X, Trang Y](#page-X)`
-Ví dụ: "Hệ thống hỗ trợ tâm lý rất quan trọng đối với Thẩm phán [Trang 10](#page-10)."
-4. Trình bày cấu trúc rõ ràng (Sử dụng tiêu đề, danh sách gạch đầu dòng, bảng biểu nếu cần).
+1. TUYỆT ĐỐI TRUNG THÀNH 100% VỚI VĂN BẢN GỐC: Chỉ được phép sử dụng thông tin CÓ THẬT SỰ XUẤT HIỆN trong nội dung bên dưới. 
+2. CẤM SÁNG TẠO: NGHIÊM CẤM tuyệt đối việc tự ý bổ sung thêm kiến thức bên ngoài (Ví dụ: Không thêm độ phức tạp thuật toán O(1), O(log n)... nếu trong text không ghi).
+3. GIỮ NGUYÊN TRÍCH DẪN SỐ TRANG: Khi bạn tổng hợp lại một ý, BẮT BUỘC phải copy và BÊ NGUYÊN thẻ trích dẫn `[Trang X](#page-X)` từ đoạn gốc đi kèm với ý đó. 
+TUYỆT ĐỐI KHÔNG được tự ý thay đổi số trang, đoán số trang, hay gộp các số trang sai lệch. Nếu đoạn gốc viết `[Trang 13](#page-13)`, bạn phải giữ nguyên `[Trang 13](#page-13)`.
+CẢNH BÁO: Nếu một loạt các ý khác nhau đều đang bị gán chung một thẻ (ví dụ `[Trang 1](#page-1)`), bạn vẫn PHẢI GIỮ NGUYÊN thẻ đó, không được tự ý sửa thành Trang 3, Trang 4.
+4. Trình bày cấu trúc rõ ràng (Tiêu đề, gạch đầu dòng).
 
-Nội dung các phần:
+Nội dung các phần (chứa sẵn trích dẫn):
 {combined_text}"""
     
     try:
