@@ -96,6 +96,19 @@ def get_document_summary(document_id: str, session_id: str):
         logger.error(f"Lỗi khi lấy summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/documents/{document_id}/flashcards", tags=["Document"])
+def get_flashcards(document_id: str, session_id: str):
+    from services.flashcard_service import generate_flashcards
+    try:
+        qdrant_client = get_qdrant_client()
+        flashcards = generate_flashcards(document_id, session_id, qdrant_client)
+        return {"status": "success", "flashcards": flashcards}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Lỗi API Flashcard: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống khi sinh flashcard: {str(e)}")
+
 @app.get("/api/documents/{document_id}/pages/{page_number}", tags=["Document"])
 def get_document_page(document_id: str, page_number: int, session_id: str):
     try:
