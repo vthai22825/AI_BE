@@ -109,6 +109,19 @@ def get_flashcards(document_id: str, session_id: str):
         logger.error(f"Lỗi API Flashcard: {e}")
         raise HTTPException(status_code=500, detail=f"Lỗi hệ thống khi sinh flashcard: {str(e)}")
 
+@app.get("/api/documents/{document_id}/mindmap", tags=["Document"])
+def get_mindmap(document_id: str, session_id: str):
+    from services.mindmap_service import generate_mindmap
+    try:
+        qdrant_client = get_qdrant_client()
+        mindmap_markdown = generate_mindmap(document_id, session_id, qdrant_client)
+        return {"status": "success", "mindmap": mindmap_markdown}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Lỗi API Mindmap: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống khi sinh mindmap: {str(e)}")
+
 @app.get("/api/documents/{document_id}/pages/{page_number}", tags=["Document"])
 def get_document_page(document_id: str, page_number: int, session_id: str):
     try:
