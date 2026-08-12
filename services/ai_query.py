@@ -39,7 +39,13 @@ def _retrieve_from_qdrant(query_vector: list[float], session_id: str, qdrant_cli
     results = qdrant_client.query_points(
         collection_name=QDRANT_COLLECTION_NAME,
         query=query_vector,
-        query_filter=Filter(must=[FieldCondition(key="session_id", match=MatchValue(value=session_id))]),
+        query_filter=Filter(
+            must=[FieldCondition(key="session_id", match=MatchValue(value=session_id))],
+            must_not=[
+                FieldCondition(key="type", match=MatchValue(value="mindmap")),
+                FieldCondition(key="type", match=MatchValue(value="global_summary"))
+            ]
+        ),
         limit=top_k,
         with_payload=True,
     )

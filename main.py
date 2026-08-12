@@ -96,6 +96,32 @@ def get_document_summary(document_id: str, session_id: str):
         logger.error(f"Lỗi khi lấy summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/documents/{document_id}/flashcards", tags=["Document"])
+def get_flashcards(document_id: str, session_id: str):
+    from services.flashcard_service import generate_flashcards
+    try:
+        qdrant_client = get_qdrant_client()
+        flashcards = generate_flashcards(document_id, session_id, qdrant_client)
+        return {"status": "success", "flashcards": flashcards}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Lỗi API Flashcard: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống khi sinh flashcard: {str(e)}")
+
+@app.get("/api/documents/{document_id}/mindmap", tags=["Document"])
+def get_mindmap(document_id: str, session_id: str):
+    from services.mindmap_service import generate_mindmap
+    try:
+        qdrant_client = get_qdrant_client()
+        mindmap_markdown = generate_mindmap(document_id, session_id, qdrant_client)
+        return {"status": "success", "mindmap": mindmap_markdown}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Lỗi API Mindmap: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống khi sinh mindmap: {str(e)}")
+
 @app.get("/api/documents/{document_id}/pages/{page_number}", tags=["Document"])
 def get_document_page(document_id: str, page_number: int, session_id: str):
     try:
@@ -157,6 +183,31 @@ async def chat_stream(request: ChatStreamRequest) -> StreamingResponse:
         logger.error(f"Lỗi khởi tạo hệ thống stream: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
+@app.delete("/api/documents/{document_id}", tags=["Document"])
+def delete_document(document_id: str):
+    """
+    Xóa toàn bộ các vectors (chunks) của một Document cụ thể trên Qdrant.
+    """
+    try:
+        qdrant_client = get_qdrant_client()
+        # Dùng qdrant_client.delete với points_selector là một Filter
+        qdrant_client.delete(
+            collection_name=QDRANT_COLLECTION_NAME,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(
+                        key="document_id",
+                        match=MatchValue(value=document_id)
+                    )
+                ]
+            )
+        )
+        logger.info(f"Đã xóa toàn bộ vectors của document_id={document_id} trên Qdrant.")
+        return {"status": "success", "message": f"Đã xóa dữ liệu của tài liệu {document_id}"}
+    except Exception as e:
+        logger.error(f"Lỗi khi xóa document {document_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="localhost", port=8000, reload=True)
