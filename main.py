@@ -183,6 +183,31 @@ async def chat_stream(request: ChatStreamRequest) -> StreamingResponse:
         logger.error(f"Lỗi khởi tạo hệ thống stream: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
+@app.delete("/api/documents/{document_id}", tags=["Document"])
+def delete_document(document_id: str):
+    """
+    Xóa toàn bộ các vectors (chunks) của một Document cụ thể trên Qdrant.
+    """
+    try:
+        qdrant_client = get_qdrant_client()
+        # Dùng qdrant_client.delete với points_selector là một Filter
+        qdrant_client.delete(
+            collection_name=QDRANT_COLLECTION_NAME,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(
+                        key="document_id",
+                        match=MatchValue(value=document_id)
+                    )
+                ]
+            )
+        )
+        logger.info(f"Đã xóa toàn bộ vectors của document_id={document_id} trên Qdrant.")
+        return {"status": "success", "message": f"Đã xóa dữ liệu của tài liệu {document_id}"}
+    except Exception as e:
+        logger.error(f"Lỗi khi xóa document {document_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="localhost", port=8000, reload=True)
