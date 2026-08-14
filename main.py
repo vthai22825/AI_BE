@@ -12,6 +12,8 @@ from services.raptor_ingestion import raptor_ingest
 
 from config import get_qdrant_client, QDRANT_COLLECTION_NAME
 from qdrant_client.http.models import FieldCondition, Filter, MatchValue
+import time
+from services.logger_service import log_event_async
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname) -7s | %(message)s")
@@ -69,7 +71,14 @@ def upload_document(
         
         # Chạy đồng bộ trực tiếp (chờ xử lý xong mới trả về)
         qdrant_client = get_qdrant_client()
+        start_time = time.time()
         result = raptor_ingest(pages, document_id, session_id, qdrant_client)
+        latency_ms = int((time.time() - start_time) * 1000)
+        
+        # Token cost from result if available, else estimate
+        token_cost = result.get("total_tokens", 0)
+        user_id = session_id.split('_')[0] if '_' in session_id else "unknown" # Temporary fallback if no user email
+        log_event_async("INFO", user_id, "Upload Document (RAPTOR)", latency_ms, token_cost)
 
         return DocumentProcessResponse(
             message=f"Đã xử lý file {file.filename} thành công",
@@ -174,6 +183,8 @@ async def chat_stream(request: ChatStreamRequest) -> StreamingResponse:
         qdrant_client = get_qdrant_client()
         
         async def event_generator():
+            start_time = time.time()
+            total_tokens = 0
             try:
                 # Gọi hàm rag_query_stream từ file ai_query.py
                 async for token in rag_query_stream(request.user_question, request.session_id, qdrant_client):
@@ -181,11 +192,19 @@ async def chat_stream(request: ChatStreamRequest) -> StreamingResponse:
                     # Xử lý xuống dòng trong token: thay \n bằng \ndata: để giữ đúng chuẩn SSE nhiều dòng
                     formatted_token = token.replace("\n", "\ndata: ")
                     yield f"data: {formatted_token}\n\n"
+                    total_tokens += 1 # estimate token count since it's streaming
                 
                 # Báo hiệu cho Frontend biết luồng đã kết thúc
                 yield "data: [DONE]\n\n"
                 
+                latency_ms = int((time.time() - start_time) * 1000)
+                user_id = request.session_id.split('_')[0] if '_' in request.session_id else "unknown"
+                log_event_async("INFO", user_id, "Chat Query", latency_ms, total_tokens)
+                
             except Exception as stream_error:
+                latency_ms = int((time.time() - start_time) * 1000)
+                user_id = request.session_id.split('_')[0] if '_' in request.session_id else "unknown"
+                log_event_async("ERROR", user_id, "Chat Query Failed", latency_ms, 0)
                 logger.error(f"Lỗi trong quá trình stream: {stream_error}")
                 # Gửi thông báo lỗi về cho Frontend nếu AI sập giữa chừng
                 yield f"data: [ERROR] Lỗi sinh chữ: {str(stream_error)}\n\n"
