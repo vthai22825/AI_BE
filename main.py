@@ -45,10 +45,24 @@ def upload_document(
                 extracted_text = page.extract_text()
                 if extracted_text:
                     pages.append({"page_number": i + 1, "text": extracted_text})
-        else: 
-            text = content.decode("utf-8")
-            if text.strip():
-                pages.append({"page_number": 1, "text": text})
+        elif file.filename and file.filename.lower().endswith((".doc", ".docx")):
+            try:
+                from docx import Document as DocxDocument
+                doc = DocxDocument(io.BytesIO(content))
+                full_text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+                if full_text:
+                    pages.append({"page_number": 1, "text": full_text})
+            except Exception as e:
+                raise ValueError(f"Không thể đọc file Word. Vui lòng đảm bảo đây là file .docx hợp lệ. (Lỗi: {str(e)})")
+        elif file.filename and file.filename.lower().endswith(".txt"): 
+            try:
+                text = content.decode("utf-8")
+                if text.strip():
+                    pages.append({"page_number": 1, "text": text})
+            except UnicodeDecodeError:
+                raise ValueError("Không thể đọc file TXT do sai bảng mã. Vui lòng lưu file bằng UTF-8.")
+        else:
+            raise ValueError("Định dạng file không được hỗ trợ. Chỉ hỗ trợ .pdf, .docx, .txt")
                 
         if not pages:
             raise ValueError("file không có chữ")

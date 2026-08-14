@@ -17,7 +17,7 @@ VECTOR_SIZE: int = 1536
 # 1. GITHUB MODELS CONFIG
 # ==========================================
 GITHUB_API_KEY: str = os.getenv("GITHUB_API_KEY", "")
-GITHUB_BASE_URL: str = "https://models.inference.ai.azure.com"
+GITHUB_BASE_URL: str = "https://models.github.ai/inference"
 
 GITHUB_FALLBACK_MODELS: list[str] = [
     "gpt-4o",
