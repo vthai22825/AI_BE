@@ -1,6 +1,5 @@
 import logging
 import json
-import random
 import time
 import uuid
 from qdrant_client import QdrantClient
@@ -8,12 +7,11 @@ from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointS
 
 from config import (
     QDRANT_COLLECTION_NAME,
-    GITHUB_API_KEY,
-    GITHUB_BASE_URL,
-    GITHUB_FALLBACK_MODELS,
-    GOOGLE_API_KEYS,
-    OLLAMA_SUMMARY_MODEL
+    OPENROUTER_API_KEY,
+    OPENROUTER_BASE_URL,
+    OPENROUTER_CHAT_MODEL
 )
+from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -102,58 +100,21 @@ Ví dụ định dạng bạn phải trả về:
 
     mindmap_markdown = ""
 
-    # A. Dùng GitHub Models trước (như flashcard_service)
-    if GITHUB_API_KEY:
-        from langchain_openai import ChatOpenAI
-        for model_name in GITHUB_FALLBACK_MODELS:
-            try:
-                logger.info(f"Đang sinh Mindmap bằng GitHub Model: {model_name}...")
-                llm = ChatOpenAI(
-                    model=model_name,
-                    api_key=GITHUB_API_KEY,
-                    base_url=GITHUB_BASE_URL,
-                    temperature=0.1,
-                    max_retries=0,
-                    timeout=30.0
-                )
-                response = llm.invoke(prompt)
-                mindmap_markdown = response.content
-                break # Thành công thì dừng
-            except Exception as e:
-                logger.warning(f"Truy xuất qua {model_name} tạo mindmap thất bại: {e}.")
-                time.sleep(1)
-
-    # B. Thử Google Gemini
-    if not mindmap_markdown and GOOGLE_API_KEYS:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        api_key = random.choice(GOOGLE_API_KEYS)
+    if OPENROUTER_API_KEY:
         try:
-            logger.info("Đang sinh Mindmap bằng Google Gemini 2.5 Flash...")
-            llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash",
-                google_api_key=api_key,
-                temperature=0.2,
-                max_retries=0
+            logger.info(f"Đang sinh Mindmap bằng OpenRouter Model: {OPENROUTER_CHAT_MODEL}...")
+            llm = ChatOpenAI(
+                model=OPENROUTER_CHAT_MODEL,
+                api_key=OPENROUTER_API_KEY,
+                base_url=OPENROUTER_BASE_URL,
+                temperature=0.1,
+                max_retries=1,
+                timeout=60.0
             )
             response = llm.invoke(prompt)
             mindmap_markdown = response.content
         except Exception as e:
-            logger.warning(f"Google API tạo mindmap lỗi: {e}.")
-            
-    # C. Thử Ollama
-    if not mindmap_markdown:
-        from langchain_ollama import ChatOllama
-        try:
-            logger.info(f"Đang sinh Mindmap bằng Local Ollama: {OLLAMA_SUMMARY_MODEL}")
-            llm = ChatOllama(
-                model=OLLAMA_SUMMARY_MODEL, 
-                temperature=0.1,      
-                timeout=180.0
-            )
-            response = llm.invoke(prompt)
-            mindmap_markdown = response.content
-        except Exception as e:
-            logger.error(f"Lỗi Ollama sinh mindmap: {e}")
+            logger.warning(f"Truy xuất OpenRouter tạo mindmap thất bại: {e}.")
 
     if not mindmap_markdown:
         raise ValueError("Toàn bộ AI Model đều thất bại trong việc tạo Mindmap.")
