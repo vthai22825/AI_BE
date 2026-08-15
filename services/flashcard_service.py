@@ -1,20 +1,20 @@
 import logging
 import json
-import random
 import time
+import uuid
+import re
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
 
 from config import (
     QDRANT_COLLECTION_NAME,
-    GITHUB_API_KEY,
-    GITHUB_BASE_URL,
-    GITHUB_FALLBACK_MODELS,
-    GOOGLE_API_KEYS,
-    OLLAMA_SUMMARY_MODEL
+    OPENROUTER_API_KEY,
+    OPENROUTER_BASE_URL,
+    OPENROUTER_CHAT_MODEL
 )
+from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +30,35 @@ class FlashcardListOutput(BaseModel):
 def generate_flashcards(document_id: str, session_id: str, qdrant_client: QdrantClient) -> List[Dict[str, str]]:
     """
     Truy xuất nội dung tóm tắt của tài liệu từ Qdrant và dùng AI để sinh ra Flashcards.
+    Có cơ chế Cache để không gọi AI nhiều lần.
     """
+    # 0. Kiểm tra xem flashcards đã được cache chưa
+    try:
+        cached_results = qdrant_client.scroll(
+            collection_name=QDRANT_COLLECTION_NAME,
+            scroll_filter=Filter(
+                must=[
+                    FieldCondition(key="document_id", match=MatchValue(value=document_id)),
+                    FieldCondition(key="session_id", match=MatchValue(value=session_id)),
+                    FieldCondition(key="type", match=MatchValue(value="flashcard"))
+                ]
+            ),
+            limit=1
+        )
+        points = cached_results[0]
+        if points:
+            logger.info("Flashcards đã tồn tại trong database. Lấy từ cache...")
+            cached_json_str = points[0].payload.get("text_content", "[]")
+            try:
+                return json.loads(cached_json_str)
+            except Exception:
+                pass
+    except Exception as e:
+        logger.warning(f"Lỗi khi check cache flashcards: {e}")
+
     # 1. Lấy nội dung từ Qdrant (ưu tiên global_summary)
     text_content = ""
+    global_vector = None
     try:
         results = qdrant_client.scroll(
             collection_name=QDRANT_COLLECTION_NAME,
@@ -43,12 +69,14 @@ def generate_flashcards(document_id: str, session_id: str, qdrant_client: Qdrant
                     FieldCondition(key="type", match=MatchValue(value="global_summary"))
                 ]
             ),
-            limit=1
+            limit=1,
+            with_vectors=True
         )
         
         points = results[0]
         if points:
             text_content = points[0].payload.get("text_content", "")
+            global_vector = points[0].vector
         else:
             # Nếu không có global summary, lôi tạm vài chunk ở level 0 ra gộp lại
             page_results = qdrant_client.scroll(
@@ -60,13 +88,15 @@ def generate_flashcards(document_id: str, session_id: str, qdrant_client: Qdrant
                         FieldCondition(key="level", match=MatchValue(value=0))
                     ]
                 ),
-                limit=10
+                limit=10,
+                with_vectors=True
             )
             page_points = page_results[0]
             if not page_points:
                 raise ValueError("Không tìm thấy nội dung tài liệu để tạo Flashcard.")
             
             text_content = "\n\n".join([p.payload.get("text_content", "") for p in page_points])
+            global_vector = page_points[0].vector
             
     except Exception as e:
         logger.error(f"Lỗi khi đọc Qdrant tạo Flashcard: {e}")
@@ -79,24 +109,17 @@ def generate_flashcards(document_id: str, session_id: str, qdrant_client: Qdrant
     prompt = f"""Bạn là một chuyên gia sư phạm. Dựa vào nội dung tài liệu dưới đây, hãy trích xuất 10-15 khái niệm/định nghĩa quan trọng nhất dưới dạng Flashcard (Thẻ ghi nhớ).
     
 QUY TẮC BẮT BUỘC:
-1. Bạn PHẢI trả về ĐÚNG định dạng JSON mảng các object. Tuyệt đối không sinh thêm các câu hội thoại như "Đây là kết quả của bạn" hay đánh dấu markdown ```json. 
-2. Mỗi object gồm 2 khóa:
+1. Bạn PHẢI trả về ĐÚNG 1 ĐỐI TƯỢNG JSON (JSON Object) có duy nhất 1 key là "flashcards", giá trị là một mảng các đối tượng.
+2. Mỗi object trong mảng gồm đúng 2 khóa:
    - "front": Khái niệm hoặc từ khóa cốt lõi (rất ngắn gọn, từ 1 đến 10 từ).
    - "back": Định nghĩa, giải thích chi tiết, dễ hiểu (từ 1 đến 3 câu).
-3. Đảm bảo nội dung mặt sau KHÔNG chứa các ký tự lạ làm hỏng chuỗi JSON (như dấu nháy kép thừa). Chỉ dùng dấu nháy đơn ' cho nội dung bên trong nếu cần.
 
 TÀI LIỆU CẦN XỬ LÝ:
 {text_content}
 """
 
-    # 3. Gọi AI Models (Thử Github GPT-4o trước, nếu fail thì qua Gemini, cuối cùng fallback Ollama)
-    from langchain_openai import ChatOpenAI
-    import json
-    import re
-    
     # Helper parser an toàn
     def parse_json_safely(text: str) -> List[Dict[str, str]]:
-        # Tìm mảng JSON bên trong text
         match = re.search(r'\[\s*\{.*?\}\s*\]', text, re.DOTALL)
         if match:
             text = match.group(0)
@@ -105,75 +128,55 @@ TÀI LIỆU CẦN XỬ LÝ:
         except Exception:
             return []
 
-    # A. Cố gắng dùng GitHub API
-    if GITHUB_API_KEY:
-        for model_name in GITHUB_FALLBACK_MODELS:
-            try:
-                logger.info(f"Đang sinh Flashcard bằng Cloud AI: {model_name}...")
-                llm = ChatOpenAI(
-                    model=model_name,
-                    api_key=GITHUB_API_KEY,
-                    base_url=GITHUB_BASE_URL,
-                    temperature=0.2, 
-                    max_retries=0
-                )
-                response = llm.invoke(prompt)
-                parsed = parse_json_safely(response.content)
-                if parsed:
-                    return parsed
-            except Exception as e:
-                logger.warning(f"Truy xuất qua {model_name} tạo flashcard thất bại: {e}.")
-                time.sleep(1)
-                
-    # B. Thử Google Gemini nếu GitHub sập
-    if GOOGLE_API_KEYS:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        api_key = random.choice(GOOGLE_API_KEYS)
+    final_flashcards = []
+    
+    if OPENROUTER_API_KEY:
         try:
-            logger.info("Đang sinh Flashcard bằng Google Gemini 2.5 Flash...")
-            llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash",
-                google_api_key=api_key,
-                temperature=0.2,
-                max_retries=0
+            logger.info(f"Đang sinh Flashcard bằng OpenRouter AI: {OPENROUTER_CHAT_MODEL}...")
+            llm = ChatOpenAI(
+                model=OPENROUTER_CHAT_MODEL,
+                api_key=OPENROUTER_API_KEY,
+                base_url=OPENROUTER_BASE_URL,
+                temperature=0.2, 
+                max_retries=1,
+                # Ép kiểu JSON_OBJECT cho các mô hình hỗ trợ
+                model_kwargs={"response_format": {"type": "json_object"}}
             )
             response = llm.invoke(prompt)
-            parsed = parse_json_safely(response.content)
-            if parsed:
-                return parsed
-        except Exception as e:
-            logger.warning(f"Google API tạo flashcard lỗi: {e}.")
             
-    # C. Cùng đường thì xài Local Ollama
-    from langchain_ollama import ChatOllama
-    try:
-        logger.info(f"Đang sinh Flashcard bằng Local Ollama: {OLLAMA_SUMMARY_MODEL}")
-        llm = ChatOllama(
-            model=OLLAMA_SUMMARY_MODEL, 
-            temperature=0.1,      
-            format="json",  # Ép ollama sinh JSON
-            timeout=180.0
-        )
-        response = llm.invoke(prompt)
-        # Vì format="json", đầu ra của Ollama thường trả về JSON object, cần check
-        content = response.content
-        parsed = parse_json_safely(content)
-        if parsed:
-            return parsed
-        else:
-            # Lỡ Ollama bọc trong dictionary kiểu {"flashcards": [...]}
+            # Giải mã JSON an toàn
             try:
-                obj = json.loads(content)
-                if isinstance(obj, dict):
-                    for key, val in obj.items():
-                        if isinstance(val, list):
-                            return val
-                elif isinstance(obj, list):
-                    return obj
+                res_obj = json.loads(response.content)
+                if "flashcards" in res_obj:
+                    final_flashcards = res_obj["flashcards"]
+                else:
+                    final_flashcards = parse_json_safely(response.content)
             except Exception:
-                pass
+                final_flashcards = parse_json_safely(response.content)
                 
+        except Exception as e:
+            logger.warning(f"Truy xuất qua OpenRouter tạo flashcard thất bại: {e}.")
+            
+    if not final_flashcards:
+        raise ValueError("AI Model thất bại trong việc tạo Flashcard hợp lệ.")
+
+    # 4. Lưu Cache vào Qdrant
+    try:
+        if global_vector is not None:
+            point = PointStruct(
+                id=str(uuid.uuid4()),
+                vector=global_vector,
+                payload={
+                    "session_id": session_id,
+                    "document_id": document_id,
+                    "level": 3,
+                    "text_content": json.dumps(final_flashcards, ensure_ascii=False),
+                    "type": "flashcard"
+                }
+            )
+            qdrant_client.upsert(collection_name=QDRANT_COLLECTION_NAME, points=[point])
+            logger.info("Đã lưu cache Flashcards vào Qdrant thành công.")
     except Exception as e:
-        logger.error(f"Lỗi Ollama sinh Flashcard: {e}")
-        
-    raise ValueError("Toàn bộ AI Model đều thất bại trong việc tạo Flashcard hợp lệ.")
+        logger.error(f"Không thể lưu flashcard vào Qdrant cache: {e}")
+
+    return final_flashcards

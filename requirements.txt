@@ -1,8 +1,7 @@
 fastapi
 uvicorn
 qdrant-client
-langchain-google-genai<3.0.0
-google-generativeai
+langchain-openai
 scikit-learn
 llmlingua
 python-dotenv
