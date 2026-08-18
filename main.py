@@ -124,7 +124,11 @@ def get_flashcards(document_id: str, session_id: str):
     from services.flashcard_service import generate_flashcards
     try:
         qdrant_client = get_qdrant_client()
-        flashcards = generate_flashcards(document_id, session_id, qdrant_client)
+        start_time = time.time()
+        flashcards, token_cost = generate_flashcards(document_id, session_id, qdrant_client)
+        latency_ms = int((time.time() - start_time) * 1000)
+        user_id = session_id.split('_')[0] if '_' in session_id else "unknown"
+        log_event_async("INFO", user_id, "Generate Flashcard", latency_ms, token_cost)
         return {"status": "success", "flashcards": flashcards}
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -137,7 +141,11 @@ def get_mindmap(document_id: str, session_id: str):
     from services.mindmap_service import generate_mindmap
     try:
         qdrant_client = get_qdrant_client()
-        mindmap_markdown = generate_mindmap(document_id, session_id, qdrant_client)
+        start_time = time.time()
+        mindmap_markdown, token_cost = generate_mindmap(document_id, session_id, qdrant_client)
+        latency_ms = int((time.time() - start_time) * 1000)
+        user_id = session_id.split('_')[0] if '_' in session_id else "unknown"
+        log_event_async("INFO", user_id, "Generate Mindmap", latency_ms, token_cost)
         return {"status": "success", "mindmap": mindmap_markdown}
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
@@ -188,11 +196,14 @@ async def chat_stream(request: ChatStreamRequest) -> StreamingResponse:
             try:
                 # Gọi hàm rag_query_stream từ file ai_query.py
                 async for token in rag_query_stream(request.user_question, request.session_id, qdrant_client):
+                    if token.startswith("\n\n[USAGE_TOKENS]"):
+                        total_tokens = int(token.split("] ")[1])
+                        continue
+                        
                     # Format chuẩn SSE: phải có chữ "data: " và kết thúc bằng "\n\n"
                     # Xử lý xuống dòng trong token: thay \n bằng \ndata: để giữ đúng chuẩn SSE nhiều dòng
                     formatted_token = token.replace("\n", "\ndata: ")
                     yield f"data: {formatted_token}\n\n"
-                    total_tokens += 1 # estimate token count since it's streaming
                 
                 # Báo hiệu cho Frontend biết luồng đã kết thúc
                 yield "data: [DONE]\n\n"

@@ -31,13 +31,13 @@ openrouter_embeddings = OpenAIEmbeddings(
     chunk_size=1 # Bắt buộc là 1 vì BGE-M3 trên OpenRouter chỉ nhận string, không nhận array
 )
 
-def _embed_texts(chunks: list[str], batch_size: int = 100) -> list[list[float]]:
+def _embed_texts(chunks: list[str], batch_size: int = 100) -> tuple[list[list[float]], int]:
     # Thư viện Langchain luôn bọc chữ trong mảng ["text"] kể cả khi dùng embed_query
     # Do đó ta dùng thư viện requests thuần tuý để đảm bảo gửi đúng định dạng string cho OpenRouter bge-m3
     all_vector = []
     total_chunks = len(chunks)
     if total_chunks == 0:
-        return []
+        return [], 0
         
     logger.info(f"Đang tiến hành nhúng {total_chunks} đoạn văn bản (Direct HTTP Request)...")
     try:
@@ -63,16 +63,19 @@ def _embed_texts(chunks: list[str], batch_size: int = 100) -> list[list[float]]:
                 raise ValueError(f"OpenRouter API Error: {res.text}")
             
             data = res.json()
-            return data["data"][0]["embedding"]
+            usage = data.get("usage", {}).get("total_tokens", 0)
+            return data["data"][0]["embedding"], usage
             
         with ThreadPoolExecutor(max_workers=5) as executor:
-            all_vector = list(executor.map(get_embedding, chunks))
+            results = list(executor.map(get_embedding, chunks))
+            all_vector = [r[0] for r in results]
+            total_tokens = sum(r[1] for r in results)
             
     except Exception as e:
         logger.error(f"Lỗi khi nhúng văn bản qua HTTP: {str(e)}")
         raise e
         
-    return all_vector
+    return all_vector, total_tokens
 
 
 # hàm co cụm
@@ -84,7 +87,7 @@ def _cluter_vertor(vectors: list[list[float]]) -> np.ndarray:
     kmeans = KMeans(n_clusters=effective_clusters, random_state=42, n_init="auto")
     return kmeans.fit_predict(np.array(vectors))
 
-def _summarize_cluster(items_in_cluster: list[dict]) -> str:
+def _summarize_cluster(items_in_cluster: list[dict]) -> tuple[str, int]:
     # Gộp văn bản kèm theo thông tin trang
     combined_text = ""
     for item in items_in_cluster:
@@ -113,14 +116,15 @@ Văn bản cần tóm tắt:
         )
             
         response = llm.invoke(prompt)
-        return response.content.strip()
+        usage = response.response_metadata.get("token_usage", {}).get("total_tokens", 0)
+        return response.content.strip(), usage
     
     except Exception as e:
         logger.error(f"OpenRouter ({OPENROUTER_CHAT_MODEL}) gặp lỗi khi tóm tắt: {e}")
-        return "Lỗi: Không thể tóm tắt đoạn văn bản này bằng AI."
+        return "Lỗi: Không thể tóm tắt đoạn văn bản này bằng AI.", 0
 
 
-def _generate_global_summary(parent_texts: list[str], parent_cited_pages: list[list[int]]) -> str:
+def _generate_global_summary(parent_texts: list[str], parent_cited_pages: list[list[int]]) -> tuple[str, int]:
     """Tóm tắt lại toàn bộ các parent_texts thành một Global Summary"""
     combined_text = ""
     for text, pages in zip(parent_texts, parent_cited_pages):
@@ -155,11 +159,12 @@ Nội dung các phần:
             max_retries=1
         )
         response = llm.invoke(prompt)
-        return response.content.strip()
+        usage = response.response_metadata.get("token_usage", {}).get("total_tokens", 0)
+        return response.content.strip(), usage
         
     except Exception as e:
         logger.error(f"Lỗi khi sinh Global Summary: {e}")
-        return "Lỗi: Không thể tạo bản tóm tắt toàn cục."
+        return "Lỗi: Không thể tạo bản tóm tắt toàn cục.", 0
 
 # hàm thực thi raptor
 def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_client: QdrantClient) -> dict[str, Any]:
@@ -187,8 +192,10 @@ def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_c
     ensure_collection_exists(qdrant_client)
     from qdrant_client.http.models import PointStruct
     
+    total_tokens_used = 0
     # embedding chunks
-    leaf_vectors = _embed_texts(chunks)
+    leaf_vectors, leaf_tokens = _embed_texts(chunks)
+    total_tokens_used += leaf_tokens
 
     # clustering và tạo nút cha
     labels = _cluter_vertor(leaf_vectors)
@@ -212,10 +219,10 @@ def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_c
     
     # Chạy song song các hàm tóm tắt
     def process_cluster(cluster_id, items):
-        summary = _summarize_cluster(items)
+        summary, tokens = _summarize_cluster(items)
         leaf_ids = [item["leaf_id"] for item in items]
         pages = list(set([item["page_number"] for item in items if item["page_number"] != "N/A"]))
-        return cluster_id, summary, leaf_ids, pages
+        return cluster_id, summary, leaf_ids, pages, tokens
 
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = [executor.submit(process_cluster, c_id, items) for c_id, items in cluster_map.items()]
@@ -228,13 +235,18 @@ def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_c
             parent_texts.append(res[1])
             parent_leaf_ids.append(res[2])
             parent_cited_pages.append(res[3])
+            total_tokens_used += res[4]
     
     # embedding nút cha
-    parent_vectors = _embed_texts(parent_texts)
+    parent_vectors, parent_tokens = _embed_texts(parent_texts)
+    total_tokens_used += parent_tokens
 
     # tạo global summary (level 2)
-    global_summary = _generate_global_summary(parent_texts, parent_cited_pages)
-    global_vector = _embed_texts([global_summary])[0]
+    global_summary, global_summary_tokens = _generate_global_summary(parent_texts, parent_cited_pages)
+    total_tokens_used += global_summary_tokens
+    
+    global_vector, global_vector_tokens = _embed_texts([global_summary])
+    total_tokens_used += global_vector_tokens
 
     # lưu vào trong qdrant
     points = []
@@ -283,4 +295,9 @@ def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_c
     qdrant_client.upsert(collection_name=QDRANT_COLLECTION_NAME, points=points)
 
     logger.info("Lưu vào database thành công")
-    return {"total_leaf_nodes": len(chunks), "total_parent_nodes": len(parent_texts), "has_global_summary": True}
+    return {
+        "total_leaf_nodes": len(leaf_ids),
+        "total_parent_nodes": len(parent_leaf_ids),
+        "total_tokens": total_tokens_used,
+        "has_global_summary": True
+    }
