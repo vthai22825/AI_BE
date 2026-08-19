@@ -189,15 +189,21 @@ Ví dụ SAI (nghiêm cấm):
             base_url=OPENROUTER_BASE_URL,
             temperature=0.2, # Sáng tạo thấp để bám sát dữ kiện
             streaming=True,
+            model_kwargs={"stream_options": {"include_usage": True}},
             max_retries=1
         )
         
         async_generator = llm.astream(prompt)
+        total_tokens = 0
         async for chunk in async_generator:
             if chunk.content: 
                 yield chunk.content
+            if hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:
+                total_tokens = chunk.usage_metadata.get("total_tokens", 0)
                 
         yield f"\n\n[CITATIONS] {citations_json}"
+        if total_tokens > 0:
+            yield f"\n\n[USAGE_TOKENS] {total_tokens}"
         
     except Exception as e:
         logger.error("Truy xuất qua OpenRouter thất bại: %s", e)

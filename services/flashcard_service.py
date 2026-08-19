@@ -50,7 +50,7 @@ def generate_flashcards(document_id: str, session_id: str, qdrant_client: Qdrant
             logger.info("Flashcards đã tồn tại trong database. Lấy từ cache...")
             cached_json_str = points[0].payload.get("text_content", "[]")
             try:
-                return json.loads(cached_json_str)
+                return json.loads(cached_json_str), 0
             except Exception:
                 pass
     except Exception as e:
@@ -129,6 +129,7 @@ TÀI LIỆU CẦN XỬ LÝ:
             return []
 
     final_flashcards = []
+    total_tokens = 0
     
     if OPENROUTER_API_KEY:
         try:
@@ -143,6 +144,7 @@ TÀI LIỆU CẦN XỬ LÝ:
                 model_kwargs={"response_format": {"type": "json_object"}}
             )
             response = llm.invoke(prompt)
+            total_tokens = response.response_metadata.get("token_usage", {}).get("total_tokens", 0)
             
             # Giải mã JSON an toàn
             try:
@@ -179,4 +181,4 @@ TÀI LIỆU CẦN XỬ LÝ:
     except Exception as e:
         logger.error(f"Không thể lưu flashcard vào Qdrant cache: {e}")
 
-    return final_flashcards
+    return final_flashcards, total_tokens

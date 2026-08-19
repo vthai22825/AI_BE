@@ -15,7 +15,7 @@ from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)
 
-def generate_mindmap(document_id: str, session_id: str, qdrant_client: QdrantClient) -> str:
+def generate_mindmap(document_id: str, session_id: str, qdrant_client: QdrantClient) -> tuple[str, int]:
     """
     Truy xuất mindmap từ bộ nhớ đệm (Qdrant). Nếu chưa có thì sinh bằng AI và lưu lại.
     Trả về chuỗi Markdown lồng nhau (tương thích markmap).
@@ -36,7 +36,7 @@ def generate_mindmap(document_id: str, session_id: str, qdrant_client: QdrantCli
         points = cached_results[0]
         if points:
             logger.info("Mindmap đã tồn tại trong database. Lấy từ cache...")
-            return points[0].payload.get("text_content", "")
+            return points[0].payload.get("text_content", ""), 0
     except Exception as e:
         logger.warning(f"Lỗi khi check cache mindmap: {e}")
 
@@ -99,6 +99,7 @@ Ví dụ định dạng bạn phải trả về:
 """
 
     mindmap_markdown = ""
+    total_tokens = 0
 
     if OPENROUTER_API_KEY:
         try:
@@ -113,6 +114,7 @@ Ví dụ định dạng bạn phải trả về:
             )
             response = llm.invoke(prompt)
             mindmap_markdown = response.content
+            total_tokens = response.response_metadata.get("token_usage", {}).get("total_tokens", 0)
         except Exception as e:
             logger.warning(f"Truy xuất OpenRouter tạo mindmap thất bại: {e}.")
 
@@ -154,4 +156,4 @@ Ví dụ định dạng bạn phải trả về:
     except Exception as e:
         logger.error(f"Không thể lưu mindmap vào Qdrant cache: {e}")
 
-    return mindmap_markdown
+    return mindmap_markdown, total_tokens
