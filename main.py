@@ -87,7 +87,8 @@ def upload_document(
             total_parent_node=result.get("total_parent_nodes", 0)
         )
     except Exception as e:
-        logger.error("Lỗi upload: %s", str(e))
+        import traceback
+        logger.error(f"Lỗi upload: {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/documents/{document_id}/summary", tags=["Document"])

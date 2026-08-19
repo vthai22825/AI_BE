@@ -74,12 +74,50 @@ def _embed_texts(chunks: list[str], batch_size: int = 100) -> tuple[list[list[fl
     except Exception as e:
         logger.error(f"Lỗi khi nhúng văn bản qua HTTP: {str(e)}")
         raise e
-        
-    return all_vector, total_tokens
+
+    # Chuẩn hóa tất cả các vector về cùng độ dài 1024 (của BGE-M3) để tránh lỗi inhomogeneous shape
+    normalized_vectors = []
+    for v in all_vector:
+        if not isinstance(v, list):
+            normalized_vectors.append([0.0] * 1024)
+        elif len(v) < 1024:
+            normalized_vectors.append(v + [0.0] * (1024 - len(v)))
+        elif len(v) > 1024:
+            normalized_vectors.append(v[:1024])
+        else:
+            normalized_vectors.append(v)
+            
+    return normalized_vectors, total_tokens
 
 
-# hàm co cụm
 def _cluter_vertor(vectors: list[list[float]]) -> np.ndarray:
+    # Đảm bảo tất cả các vector có cùng kích thước trước khi đưa vào KMeans
+    if not vectors:
+        return np.array([])
+        
+    # Tìm độ dài phổ biến nhất (thường là 1024)
+    try:
+        lengths = [len(v) if isinstance(v, list) else 0 for v in vectors]
+        from collections import Counter
+        most_common_len = Counter([l for l in lengths if l > 0]).most_common(1)[0][0]
+        
+        valid_vectors = []
+        for v in vectors:
+            if not isinstance(v, list):
+                valid_vectors.append([0.0] * most_common_len)
+            elif len(v) < most_common_len:
+                # Pad with zeros
+                valid_vectors.append(v + [0.0] * (most_common_len - len(v)))
+            elif len(v) > most_common_len:
+                # Truncate
+                valid_vectors.append(v[:most_common_len])
+            else:
+                valid_vectors.append(v)
+                
+        vectors = valid_vectors
+    except Exception as e:
+        logger.error(f"Lỗi khi chuẩn hóa vector: {e}")
+
     # số lượng cụm là tổng vector chia 6 lấy phần nguyên (cân bằng tốc độ và chi tiết)
     n_samples = len(vectors)
     effective_clusters = max(1, n_samples // 6)
