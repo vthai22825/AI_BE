@@ -1,0 +1,79 @@
+Dưới đây là bản tóm tắt học thuật toàn diện về các kiến thức chuyên môn trong tài liệu.
+
+### Kiểu dữ liệu Generic (Generic Data Types)
+
+Kiểu dữ liệu Generic trong Java là một tính năng mạnh mẽ giúp gia tăng tính linh hoạt và độ an toàn của mã nguồn. Generic cho phép định nghĩa các lớp (classes), giao diện (interfaces), và phương thức (methods) với các kiểu dữ liệu được tham số hóa. Thay vì chỉ định một kiểu dữ liệu cụ thể (như Integer, String), lập trình viên có thể sử dụng một ký hiệu đại diện cho bất kỳ kiểu dữ liệu nào.
+
+Các thành phần chính của Generic bao gồm:
+
+* **Lớp Generic (Generic Class):** Một lớp có thể hoạt động với bất kỳ kiểu dữ liệu nào thông qua việc sử dụng tham số kiểu (ví dụ: `T`).
+
+
+* **Phương thức Generic (Generic Method):** Cho phép truyền tham số kiểu dữ liệu vào phương thức để xử lý nhiều loại mảng hoặc tập hợp khác nhau.
+
+
+* **Giao diện Generic (Generic Interface):** Hỗ trợ xây dựng các giao diện linh hoạt với nhiều tham số kiểu (ví dụ: `K` đại diện cho Key, `V` đại diện cho Value).
+
+
+
+Những lợi ích cốt lõi của việc sử dụng Generic:
+
+* **An toàn kiểu dữ liệu (Type Safety):** Giúp phát hiện lỗi ngay tại thời điểm biên dịch (compile time), làm giảm thiểu rủi ro lỗi trong quá trình thực thi (runtime errors).
+
+
+* **Tái sử dụng mã (Code Reusability):** Viết mã một lần và có thể tái sử dụng cho nhiều kiểu dữ liệu khác nhau.
+
+
+* **Loại bỏ việc ép kiểu (Elimination of Casting):** Giúp tránh được việc phải ép kiểu thủ công, làm cho mã nguồn trở nên dễ đọc và an toàn hơn.
+
+
+
+### Khung tập hợp (Collections Framework)
+
+Collections Framework (thuộc gói `java.util`) là một kiến trúc thống nhất dùng để biểu diễn và thao tác trên các tập hợp (collections) – một nhóm các đối tượng. Xét về tổng thể, kiến trúc này không đảm bảo tính an toàn luồng (thread-safe).
+
+Dưới đây là bảng so sánh các cấu trúc dữ liệu chính trong Collections Framework:
+
+| Cấu trúc | Đặc điểm | Yếu tố trùng lặp | Các lớp triển khai (Implementing Classes) |
+| --- | --- | --- | --- |
+| **List** | Giữ nguyên thứ tự của các phần tử khi thêm vào; quản lý phần tử qua chỉ số (index) bắt đầu từ 0. Các phương thức phổ biến: `add`, `get`, `indexOf`, `remove`.
+
+ | Cho phép trùng lặp.
+
+ | `AbstractList`, `ArrayList`, `Vector` (tương tự ArrayList nhưng được đồng bộ hóa), `LinkedList` (có thể dùng như stack, queue, hoặc deque).
+
+ |
+| **Set** | Không có khái niệm về thứ tự; chỉ là một cụm các tham chiếu đến đối tượng. Kế thừa từ `Collection` nhưng không thêm phương thức mới. Sử dụng phương thức `equals()` (không dùng toán tử `==`) để kiểm tra trùng lặp.
+
+ | Không cho phép trùng lặp.
+
+ | `HashSet` (hiệu suất thời gian hằng số đối với các thao tác cơ bản), `TreeSet` (đảm bảo các phần tử được sắp xếp tăng dần, chi phí thời gian cho các thao tác cơ bản là $log(n)$).
+
+ |
+| **Map** | Không kế thừa giao diện `java.util.Collection`. Hoạt động giống như một từ điển, kết hợp hai tập hợp: keys (khóa) và values (giá trị), trong đó mỗi khóa liên kết chính xác với một giá trị. Khóa thường sử dụng kiểu `String`.
+
+ | Khóa (key) không được trùng lặp, kiểm tra tính duy nhất dựa trên phương thức `equals()`.
+
+ | `HashMap`, `TreeMap`.
+
+ |
+
+### Các khái niệm nền tảng về tổ chức dữ liệu
+
+* **TreeSet và Iterator:**
+* *Cây có thứ tự (Ordered Tree):* Khái niệm bắt nguồn từ Toán rời rạc; TreeSet là sự kết hợp giữa Set và cây có thứ tự, trong đó mỗi phần tử được gọi là một nút (node).
+
+
+* *Iterator:* Là một thao tác trong đó các tham chiếu của tất cả các nút được nhóm lại để tạo thành một danh sách liên kết; cung cấp cách thức truy cập vào mọi nút của cây.
+
+
+* *Danh sách liên kết (Linked list):* Là một nhóm các phần tử, mỗi phần tử chứa một tham chiếu trỏ tới phần tử tiếp theo.
+
+
+
+
+* **Bảng băm (Hash Table) so với Mảng (Array):**
+* Trong mảng, các phần tử được lưu trữ ở các khối bộ nhớ liên tiếp; việc sử dụng tìm kiếm tuyến tính sẽ chậm, tìm kiếm nhị phân là một giải pháp cải thiện.
+
+
+* Trong bảng băm, các phần tử có thể được lưu ở các khối bộ nhớ khác nhau; chỉ số của phần tử được xác định bởi một hàm băm (hash function), giúp cho các thao tác thêm và tìm kiếm diễn ra rất nhanh với độ phức tạp $O(1)$.

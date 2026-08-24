@@ -1,0 +1,62 @@
+Dưới đây là bản tóm tắt học thuật toàn diện các kiến thức chuyên môn cốt lõi được trích xuất từ tài liệu, loại bỏ toàn bộ các thông tin lặp lại và không mang giá trị học thuật.
+
+### Các Nguyên Lý và Khái Niệm Cốt Lõi
+
+Tài liệu thiết lập hệ phương pháp luận của khoa học máy tính thông qua các nguyên lý nền tảng sau:
+
+* **Kiến trúc Von Neumann:** Là nền tảng của máy tính hiện đại, hoạt động dựa trên nguyên lý chia tách bộ nhớ chứa chương trình và bộ xử lý trung tâm (CPU).
+
+
+* **Độ phức tạp thuật toán (Big O Notation):** Mô hình toán học giúp các kỹ sư phần mềm đánh giá định lượng về thời gian thực thi (time complexity) và dung lượng bộ nhớ tiêu thụ (space complexity) của hệ thống.
+
+
+* **Cấu trúc dữ liệu:** Yếu tố quyết định cách thức tổ chức thông tin trong bộ nhớ vật lý, có ảnh hưởng trực tiếp và quyết định đến hiệu năng của thuật toán.
+
+
+* **Hệ quản trị cơ sở dữ liệu quan hệ (RDBMS):** Đảm bảo tính nhất quán của dữ liệu thông qua các ràng buộc toàn vẹn và tuân thủ chặt chẽ các tính chất của giao dịch ACID (Atomicity, Consistency, Isolation, Durability).
+
+
+* **Trí tuệ nhân tạo (AI):** Vận hành dựa trên các mạng thần kinh nhân tạo sâu (Deep Neural Networks) để tự động trích xuất và học các đặc trưng từ tập dữ liệu quy mô lớn.
+
+
+* **Điện toán lượng tử:** Xu hướng điện toán tương lai được kỳ vọng sẽ phá vỡ mọi giới hạn xử lý thông tin của các hệ thống máy tính cổ điển.
+
+
+
+### Nội Dung Chuyên Sâu Theo Các Mô-đun
+
+Tài liệu phân chia kiến thức thành ba mô-đun chính, tập trung vào việc kết hợp giữa lý thuyết thuật toán và kỹ thuật phần cứng:
+
+* **Mô-đun I (Kiến trúc hệ thống và biểu diễn dữ liệu):** Phân tích cơ chế nạp lệnh của CPU, hệ thống biểu diễn số nhị phân, số Bù 2 và việc ứng dụng Logic Boole trong phần cứng.
+
+
+* **Mô-đun II (Cấu trúc dữ liệu và giải thuật tối ưu hóa):** Nghiên cứu các cấu trúc dữ liệu tuyến tính và ứng dụng của chúng trong quản lý bộ nhớ; đồng thời phân tích hiệu năng của các thuật toán sắp xếp kinh điển (Merge Sort, Quick Sort).
+
+
+* **Mô-đun III (Hệ thống phân tán, Cơ sở dữ liệu và Mật mã học):** Tập trung vào tối ưu hóa truy vấn SQL nâng cao và các nguyên lý bảo mật an toàn thông tin thông qua mã hóa đối xứng (AES) và bất đối xứng (RSA).
+
+
+
+### Tổng Hợp Các Thuật Toán Thực Hành (Pseudocode)
+
+Dưới đây là bảng tổng hợp các thuật toán được mô phỏng trong tài liệu, mô tả logic cốt lõi và phương pháp tiếp cận:
+
+| Tên thuật toán | Mô tả Logic Cốt lõi | Biểu thức Toán học / Mệnh đề Logic |
+| --- | --- | --- |
+| **Cộng nhị phân 8-bit** (Sử dụng cổng Logic)
+
+ | Duyệt qua 8 bit từ cao xuống thấp (7 đến 0). Tính tổng từng bit và biến nhớ (`carry`) bằng các cổng XOR, AND, OR.
+
+ | Bị số: $sum = A \oplus B \oplus carry$ <br>
+
+<br> Biến nhớ: $carry = (A \land B) \lor (carry \land (A \oplus B))$<br> |
+| **Tìm kiếm nhị phân đệ quy** (Binary Search)
+
+ | Tìm kiếm phần tử `target` trong mảng đã sắp xếp bằng cách chia đôi mảng. Dừng lại khi tìm thấy hoặc `low > high`. Độ phức tạp đạt $O(\log N)$.
+
+ | $mid = low + \frac{high - low}{2}$<br> |
+| **Tạo khóa mã hóa bất đối xứng RSA**<br> | Dựa trên 2 số nguyên tố `p` và `q`. Tính toán hàm phi Euler, chọn số nguyên tố cùng nhau `e` và tính nghịch đảo modulo `d`.
+
+ | $n = p \times q$ <br>
+
+<br> $\phi = (p-1)(q-1)$<br> |

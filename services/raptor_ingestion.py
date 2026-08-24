@@ -74,50 +74,12 @@ def _embed_texts(chunks: list[str], batch_size: int = 100) -> tuple[list[list[fl
     except Exception as e:
         logger.error(f"Lỗi khi nhúng văn bản qua HTTP: {str(e)}")
         raise e
-
-    # Chuẩn hóa tất cả các vector về cùng độ dài 1024 (của BGE-M3) để tránh lỗi inhomogeneous shape
-    normalized_vectors = []
-    for v in all_vector:
-        if not isinstance(v, list):
-            normalized_vectors.append([0.0] * 1024)
-        elif len(v) < 1024:
-            normalized_vectors.append(v + [0.0] * (1024 - len(v)))
-        elif len(v) > 1024:
-            normalized_vectors.append(v[:1024])
-        else:
-            normalized_vectors.append(v)
-            
-    return normalized_vectors, total_tokens
+        
+    return all_vector, total_tokens
 
 
+# hàm co cụm
 def _cluter_vertor(vectors: list[list[float]]) -> np.ndarray:
-    # Đảm bảo tất cả các vector có cùng kích thước trước khi đưa vào KMeans
-    if not vectors:
-        return np.array([])
-        
-    # Tìm độ dài phổ biến nhất (thường là 1024)
-    try:
-        lengths = [len(v) if isinstance(v, list) else 0 for v in vectors]
-        from collections import Counter
-        most_common_len = Counter([l for l in lengths if l > 0]).most_common(1)[0][0]
-        
-        valid_vectors = []
-        for v in vectors:
-            if not isinstance(v, list):
-                valid_vectors.append([0.0] * most_common_len)
-            elif len(v) < most_common_len:
-                # Pad with zeros
-                valid_vectors.append(v + [0.0] * (most_common_len - len(v)))
-            elif len(v) > most_common_len:
-                # Truncate
-                valid_vectors.append(v[:most_common_len])
-            else:
-                valid_vectors.append(v)
-                
-        vectors = valid_vectors
-    except Exception as e:
-        logger.error(f"Lỗi khi chuẩn hóa vector: {e}")
-
     # số lượng cụm là tổng vector chia 6 lấy phần nguyên (cân bằng tốc độ và chi tiết)
     n_samples = len(vectors)
     effective_clusters = max(1, n_samples // 6)
@@ -131,15 +93,15 @@ def _summarize_cluster(items_in_cluster: list[dict]) -> tuple[str, int]:
     for item in items_in_cluster:
         combined_text += f"\n--- Trang {item['page_number']} ---\n{item['text']}"
 
-    prompt = f"""Bạn là một chuyên gia tổng hợp thông tin học thuật. Nhiệm vụ của bạn là đọc các đoạn trích dưới đây và viết một bản tóm tắt toàn diện, súc tích, đi thẳng vào vấn đề cốt lõi.
+    prompt = f"""Bạn là một chuyên gia tổng hợp thông tin. Nhiệm vụ của bạn là đọc các đoạn trích dưới đây và viết một bản tóm tắt toàn diện nhưng súc tích.
     
 YÊU CẦU QUAN TRỌNG:
-1. LOẠI BỎ THÔNG TIN NHIỄU (ANTI-SPAM): Tuyệt đối KHÔNG đưa vào bản tóm tắt các thông tin rác lặp lại ở đầu/cuối mỗi trang (ví dụ: tên tác giả, tên trung tâm, số điện thoại, bản quyền, địa chỉ web). Chỉ tập trung vào CHUYÊN MÔN và KIẾN THỨC.
-2. BẢNG BIỂU CHO DỮ LIỆU CẤU TRÚC: BẤT CỨ KHI NÀO có các cặp số liệu, tập hợp mẫu thống kê, danh sách tham số... BẮT BUỘC trình bày dưới dạng Bảng Markdown `| Cột 1 | Cột 2 |`. KHÔNG liệt kê số liệu liên tiếp bằng dấu phẩy trong ngoặc đơn.
-3. ĐỊNH DẠNG TOÁN HỌC (LaTeX): Mọi biến số toán học (X, Y), công thức, ký hiệu xác suất, phương trình BẮT BUỘC phải bọc trong dấu `$` (inline) hoặc `$$` (block) để hiển thị chuẩn xác.
-4. TRÍCH DẪN TẠI CHỖ (INLINE CITATIONS): Khi tóm tắt một ý, BẮT BUỘC chèn liên kết markdown trích dẫn nguồn trang ngay tại dòng đó. Nếu trình bày Bảng, hãy đặt trích dẫn ngay trên tiêu đề bảng.
-- Cú pháp trích dẫn: `[Trang X](#page-X)` hoặc `[Trang X, Trang Y](#page-X)`.
-- Không lặp lại trích dẫn liên tục nếu cùng một trang.
+1. Giữ lại tất cả các từ khóa, định nghĩa, thực thể (tên riêng, địa điểm, số liệu) và các khái niệm cốt lõi.
+2. Trình bày rõ ràng mối liên hệ giữa các ý chính để nội dung có thể được dùng làm tài liệu tra cứu (RAG).
+3. Không thêm thắt thông tin bên ngoài, chỉ dựa vào văn bản được cung cấp.
+4. TRÍCH DẪN TẠI CHỖ (INLINE CITATIONS): Khi bạn tóm tắt một ý hoặc một đoạn, BẮT BUỘC phải chèn một liên kết markdown trích dẫn nguồn trang ngay tại dòng đó (ở cuối câu hoặc đoạn). 
+Cú pháp trích dẫn BẮT BUỘC: `[Trang X](#page-X)` hoặc `[Trang X, Trang Y](#page-X)`
+Ví dụ: "Hệ thống hỗ trợ tâm lý rất quan trọng đối với Thẩm phán [Trang 10](#page-10)."
 
 Văn bản cần tóm tắt:
 {combined_text}"""
@@ -170,17 +132,19 @@ def _generate_global_summary(parent_texts: list[str], parent_cited_pages: list[l
         pages_str = ", ".join(map(str, pages)) if pages else "N/A"
         combined_text += f"\n--- Nguồn từ các trang: {pages_str} ---\n{text}"
     
-    prompt = f"""Bạn là một chuyên gia tổng hợp tài liệu cấp cao. Dưới đây là các bản tóm tắt của từng phần trong một tài liệu. Nhiệm vụ của bạn là gộp chúng lại và viết một BẢN TÓM TẮT TOÀN CỤC bao quát toàn bộ tài liệu.
+    prompt = f"""Bạn là một chuyên gia tổng hợp tài liệu cấp cao.
+Dưới đây là các bản tóm tắt của từng phần trong một tài liệu (có kèm số trang). Nhiệm vụ của bạn là gộp chúng lại và viết một BẢN TÓM TẮT TOÀN CỤC bao quát toàn bộ tài liệu.
 
-YÊU CẦU NGHIÊM NGẶT VỀ ĐỊNH DẠNG VÀ NỘI DUNG:
-1. LOẠI BỎ THÔNG TIN NHIỄU: Tuyệt đối KHÔNG liệt kê tên tác giả, số điện thoại, tên trung tâm hoặc các thông tin bản quyền ở header/footer. Đi thẳng vào kiến thức chuyên môn.
-2. GỘP TRÍCH DẪN THÔNG MINH (ANTI-SPAM CITATIONS): KHÔNG BAO GIỜ tạo ra một chuỗi trích dẫn khổng lồ kiểu `[Trang 1, Trang 2... Trang 50]`. Nếu một thông tin quá chung chung xuất hiện ở mọi trang, HÃY BỎ QUA trích dẫn cho thông tin đó. Cú pháp trích dẫn: `[Trang X](#page-X)`.
-3. SỬ DỤNG BẢNG (MARKDOWN TABLES): Khi gặp các danh sách số liệu, so sánh tham số, dữ liệu tương quan, BẮT BUỘC dùng thẻ Bảng `| Cột 1 | Cột 2 |` để trình bày rõ ràng.
-4. TOÁN HỌC VÀ THỐNG KÊ (LaTeX): Mọi công thức, ký hiệu toán học, biến số phải được bọc trong `$` hoặc `$$`.
-5. CẤU TRÚC UI THOÁNG ĐÃNG: 
-- Bắt buộc tạo các Tiêu đề con (`###`, `####`) phân cấp rõ ràng.
-- Sử dụng Quote `>` cho các định nghĩa quan trọng.
-- Bắt buộc có 1 dòng trống (blank line) giữa các đoạn văn, tiêu đề và bảng biểu.
+YÊU CẦU NGHIÊM NGẶT:
+1. TUYỆT ĐỐI TRUNG THÀNH VỚI VĂN BẢN: Không được tự ý sáng tạo, không chèn thêm bất kỳ kiến thức cá nhân nào.
+2. BẢO TOÀN THUẬT NGỮ: Không được khái quát hóa các danh sách quan trọng.
+3. TRÍCH DẪN (INLINE CITATIONS): BẮT BUỘC chèn thẻ trích dẫn dưới dạng Markdown link `[Trang X](#page-X)` vào văn bản. 
+- ĐỂ TRÁNH LẶP LẠI RỐI MẮT: Nếu nhiều câu liên tiếp hoặc một danh sách lấy từ CÙNG MỘT TRANG, CHỈ CẦN đặt 1 trích dẫn duy nhất ở cuối đoạn văn hoặc cuối danh sách. KHÔNG lặp lại trích dẫn ở mọi dòng.
+Ví dụ: "Hệ thống hỗ trợ tâm lý rất quan trọng đối với Thẩm phán [Trang 10](#page-10)."
+4. Trình bày cấu trúc RẤT RÕ RÀNG VÀ THOÁNG ĐÃNG (ĐỂ HIỂN THỊ ĐẸP TRÊN UI):
+- BẮT BUỘC cách nhau bằng một DÒNG TRỐNG (blank line) giữa các đoạn văn, giữa các tiêu đề, và đặc biệt là giữa các mục trong danh sách gạch đầu dòng.
+- KHÔNG viết các đoạn văn quá dài (ríu chữ). Hãy ngắt thành các ý nhỏ và xuống dòng thường xuyên.
+- Sử dụng in đậm cho các từ khóa và tiêu đề phụ để tăng tính mạch lạc.
 
 Nội dung các phần:
 {combined_text}"""
@@ -317,7 +281,7 @@ def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_c
     all_pages = list(set([p for p in page_numbers if p != "N/A"]))
     points.append(PointStruct(
         id=str(uuid.uuid4()), 
-        vector=global_vector[0], 
+        vector=global_vector, 
         payload={
             "session_id": session_id, 
             "document_id": document_id, 
