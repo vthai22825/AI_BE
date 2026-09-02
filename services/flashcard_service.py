@@ -32,29 +32,7 @@ def generate_flashcards(document_id: str, session_id: str, qdrant_client: Qdrant
     Truy xuất nội dung tóm tắt của tài liệu từ Qdrant và dùng AI để sinh ra Flashcards.
     Có cơ chế Cache để không gọi AI nhiều lần.
     """
-    # 0. Kiểm tra xem flashcards đã được cache chưa
-    try:
-        cached_results = qdrant_client.scroll(
-            collection_name=QDRANT_COLLECTION_NAME,
-            scroll_filter=Filter(
-                must=[
-                    FieldCondition(key="document_id", match=MatchValue(value=document_id)),
-                    FieldCondition(key="session_id", match=MatchValue(value=session_id)),
-                    FieldCondition(key="type", match=MatchValue(value="flashcard"))
-                ]
-            ),
-            limit=1
-        )
-        points = cached_results[0]
-        if points:
-            logger.info("Flashcards đã tồn tại trong database. Lấy từ cache...")
-            cached_json_str = points[0].payload.get("text_content", "[]")
-            try:
-                return json.loads(cached_json_str), 0
-            except Exception:
-                pass
-    except Exception as e:
-        logger.warning(f"Lỗi khi check cache flashcards: {e}")
+    # (Đã gỡ bỏ logic check Cache Qdrant, hệ thống luôn sinh thẻ mới theo mô hình NotebookLM)
 
     # 1. Lấy nội dung từ Qdrant (ưu tiên global_summary)
     text_content = ""
@@ -162,23 +140,6 @@ TÀI LIỆU CẦN XỬ LÝ:
     if not final_flashcards:
         raise ValueError("AI Model thất bại trong việc tạo Flashcard hợp lệ.")
 
-    # 4. Lưu Cache vào Qdrant
-    try:
-        if global_vector is not None:
-            point = PointStruct(
-                id=str(uuid.uuid4()),
-                vector=global_vector,
-                payload={
-                    "session_id": session_id,
-                    "document_id": document_id,
-                    "level": 3,
-                    "text_content": json.dumps(final_flashcards, ensure_ascii=False),
-                    "type": "flashcard"
-                }
-            )
-            qdrant_client.upsert(collection_name=QDRANT_COLLECTION_NAME, points=[point])
-            logger.info("Đã lưu cache Flashcards vào Qdrant thành công.")
-    except Exception as e:
-        logger.error(f"Không thể lưu flashcard vào Qdrant cache: {e}")
+    # 4. (Đã gỡ bỏ logic lưu Cache vào Qdrant. Java BE MySQL sẽ đảm nhận việc lưu trữ)
 
     return final_flashcards, total_tokens
