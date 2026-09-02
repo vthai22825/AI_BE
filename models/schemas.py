@@ -10,3 +10,9 @@ class DocumentProcessResponse(BaseModel):
 class ChatStreamRequest(BaseModel):
     session_id: str
     user_question: str
+
+class FlashcardGenerateRequest(BaseModel):
+    session_id: str
+    number_of_cards: str = "Tiêu chuẩn"
+    difficulty: str = "Trung bình"
+    topic: str = ""

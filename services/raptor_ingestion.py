@@ -281,7 +281,7 @@ def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_c
     all_pages = list(set([p for p in page_numbers if p != "N/A"]))
     points.append(PointStruct(
         id=str(uuid.uuid4()), 
-        vector=global_vector, 
+        vector=global_vector[0] if len(global_vector) > 0 else [], 
         payload={
             "session_id": session_id, 
             "document_id": document_id, 

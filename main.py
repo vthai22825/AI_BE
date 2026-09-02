@@ -5,7 +5,7 @@ import PyPDF2
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from models.schemas import DocumentProcessResponse, ChatStreamRequest
+from models.schemas import DocumentProcessResponse, ChatStreamRequest, FlashcardGenerateRequest
 
 from services.ai_query import rag_query_stream
 from services.raptor_ingestion import raptor_ingest
@@ -120,15 +120,22 @@ def get_document_summary(document_id: str, session_id: str):
         logger.error(f"Lỗi khi lấy summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/documents/{document_id}/flashcards", tags=["Document"])
-def get_flashcards(document_id: str, session_id: str):
+@app.post("/api/documents/{document_id}/flashcards", tags=["Document"])
+def generate_flashcards_api(document_id: str, request: FlashcardGenerateRequest):
     from services.flashcard_service import generate_flashcards
     try:
         qdrant_client = get_qdrant_client()
         start_time = time.time()
-        flashcards, token_cost = generate_flashcards(document_id, session_id, qdrant_client)
+        flashcards, token_cost = generate_flashcards(
+            document_id=document_id, 
+            session_id=request.session_id, 
+            number_of_cards=request.number_of_cards,
+            difficulty=request.difficulty,
+            topic=request.topic,
+            qdrant_client=qdrant_client
+        )
         latency_ms = int((time.time() - start_time) * 1000)
-        user_id = session_id.split('_')[0] if '_' in session_id else "unknown"
+        user_id = request.session_id.split('_')[0] if '_' in request.session_id else "unknown"
         log_event_async("INFO", user_id, "Generate Flashcard", latency_ms, token_cost)
         return {"status": "success", "flashcards": flashcards}
     except ValueError as ve:

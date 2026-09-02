@@ -42,7 +42,6 @@ def generate_mindmap(document_id: str, session_id: str, qdrant_client: QdrantCli
 
     # 2. Nếu chưa có, lấy global_summary để tạo mindmap
     text_content = ""
-    global_vector = None
     try:
         results = qdrant_client.scroll(
             collection_name=QDRANT_COLLECTION_NAME,
@@ -54,13 +53,12 @@ def generate_mindmap(document_id: str, session_id: str, qdrant_client: QdrantCli
                 ]
             ),
             limit=1,
-            with_vectors=True
+            with_vectors=False
         )
         
         points = results[0]
         if points:
             text_content = points[0].payload.get("text_content", "")
-            global_vector = points[0].vector
     except Exception as e:
         logger.error(f"Lỗi khi lấy global_summary từ Qdrant: {e}")
         raise ValueError(f"Không thể truy xuất dữ liệu từ Qdrant: {e}")
@@ -131,29 +129,5 @@ Ví dụ định dạng bạn phải trả về:
         mindmap_markdown = mindmap_markdown[:-3]
     mindmap_markdown = mindmap_markdown.strip()
 
-    # 4. Lưu lại vào Qdrant để cache
-    try:
-        # Nếu global_summary không trả về vector (vì lý do nào đó), ta sinh một vector 0 giả
-        if global_vector is None:
-            # Qdrant cần biết vector dimension, tốt nhất là lấy vector từ query. 
-            # Tuy nhiên with_vectors=True ở trên đã lấy vector rồi.
-            pass
-            
-        if global_vector is not None:
-            point = PointStruct(
-                id=str(uuid.uuid4()),
-                vector=global_vector,
-                payload={
-                    "session_id": session_id,
-                    "document_id": document_id,
-                    "level": 3,
-                    "text_content": mindmap_markdown,
-                    "type": "mindmap"
-                }
-            )
-            qdrant_client.upsert(collection_name=QDRANT_COLLECTION_NAME, points=[point])
-            logger.info("Đã lưu cache Mindmap vào Qdrant thành công.")
-    except Exception as e:
-        logger.error(f"Không thể lưu mindmap vào Qdrant cache: {e}")
-
+    # 4. Lưu lại vào Qdrant để cache (Đã vô hiệu hóa để tránh lỗi numpy)
     return mindmap_markdown, total_tokens
