@@ -27,34 +27,12 @@ class FlashcardListOutput(BaseModel):
     flashcards: List[FlashcardOutput] = Field(description="Danh sách gồm 10 đến 15 thẻ flashcard.")
 
 
-def generate_flashcards(document_id: str, session_id: str, qdrant_client: QdrantClient) -> List[Dict[str, str]]:
+def generate_flashcards(document_id: str, session_id: str, number_of_cards: str, difficulty: str, topic: str, qdrant_client: QdrantClient) -> List[Dict[str, str]]:
     """
     Truy xuất nội dung tóm tắt của tài liệu từ Qdrant và dùng AI để sinh ra Flashcards.
     Có cơ chế Cache để không gọi AI nhiều lần.
     """
-    # 0. Kiểm tra xem flashcards đã được cache chưa
-    try:
-        cached_results = qdrant_client.scroll(
-            collection_name=QDRANT_COLLECTION_NAME,
-            scroll_filter=Filter(
-                must=[
-                    FieldCondition(key="document_id", match=MatchValue(value=document_id)),
-                    FieldCondition(key="session_id", match=MatchValue(value=session_id)),
-                    FieldCondition(key="type", match=MatchValue(value="flashcard"))
-                ]
-            ),
-            limit=1
-        )
-        points = cached_results[0]
-        if points:
-            logger.info("Flashcards đã tồn tại trong database. Lấy từ cache...")
-            cached_json_str = points[0].payload.get("text_content", "[]")
-            try:
-                return json.loads(cached_json_str), 0
-            except Exception:
-                pass
-    except Exception as e:
-        logger.warning(f"Lỗi khi check cache flashcards: {e}")
+    # (Đã gỡ bỏ logic check Cache Qdrant, hệ thống luôn sinh thẻ mới theo mô hình NotebookLM)
 
     # 1. Lấy nội dung từ Qdrant (ưu tiên global_summary)
     text_content = ""
@@ -70,13 +48,12 @@ def generate_flashcards(document_id: str, session_id: str, qdrant_client: Qdrant
                 ]
             ),
             limit=1,
-            with_vectors=True
+            with_vectors=False
         )
         
         points = results[0]
         if points:
             text_content = points[0].payload.get("text_content", "")
-            global_vector = points[0].vector
         else:
             # Nếu không có global summary, lôi tạm vài chunk ở level 0 ra gộp lại
             page_results = qdrant_client.scroll(
@@ -89,14 +66,13 @@ def generate_flashcards(document_id: str, session_id: str, qdrant_client: Qdrant
                     ]
                 ),
                 limit=10,
-                with_vectors=True
+                with_vectors=False
             )
             page_points = page_results[0]
             if not page_points:
                 raise ValueError("Không tìm thấy nội dung tài liệu để tạo Flashcard.")
             
             text_content = "\n\n".join([p.payload.get("text_content", "") for p in page_points])
-            global_vector = page_points[0].vector
             
     except Exception as e:
         logger.error(f"Lỗi khi đọc Qdrant tạo Flashcard: {e}")
@@ -105,14 +81,35 @@ def generate_flashcards(document_id: str, session_id: str, qdrant_client: Qdrant
     if not text_content.strip():
         raise ValueError("Nội dung tài liệu trống.")
 
-    # 2. Xây dựng Prompt
-    prompt = f"""Bạn là một chuyên gia sư phạm. Dựa vào nội dung tài liệu dưới đây, hãy trích xuất 10-15 khái niệm/định nghĩa quan trọng nhất dưới dạng Flashcard (Thẻ ghi nhớ).
+    # 2. Xây dựng cấu hình Prompt dựa vào yêu cầu người dùng
+    number_inst = "10 đến 15 thẻ"
+    if number_of_cards == "Ít hơn":
+        number_inst = "5 đến 7 thẻ"
+    elif number_of_cards == "Nhiều hơn":
+        number_inst = "20 đến 25 thẻ"
+        
+    diff_inst = "Tập trung vào các khái niệm cốt lõi, có giải thích chi tiết và ví dụ minh họa nếu cần."
+    if difficulty == "Dễ":
+        diff_inst = "Chỉ tập trung vào các từ vựng, khái niệm cơ bản nhất. Mặt sau giải thích cực kỳ ngắn gọn, dễ hiểu cho người mới bắt đầu."
+    elif difficulty == "Khó":
+        diff_inst = "Đòi hỏi tư duy suy luận. Tạo ra các câu hỏi dạng so sánh, phân tích chuyên sâu, hoặc tình huống phức tạp có trong tài liệu."
+        
+    topic_inst = "Quét toàn bộ tài liệu để tìm các ý chính quan trọng nhất."
+    if topic and topic.strip():
+        topic_inst = f"CHỈ TẬP TRUNG TẠO THẺ CHO CHỦ ĐỀ SAU: '{topic.strip()}'. Bỏ qua các nội dung không liên quan."
+
+    prompt = f"""Bạn là một chuyên gia sư phạm. Dựa vào nội dung tài liệu dưới đây, hãy trích xuất các khái niệm quan trọng nhất dưới dạng Flashcard (Thẻ ghi nhớ).
     
+YÊU CẦU CỤ THỂ:
+- Số lượng thẻ: Bạn cần sinh ra khoảng {number_inst}.
+- Độ khó và Nội dung: {diff_inst}
+- Chủ đề tập trung: {topic_inst}
+
 QUY TẮC BẮT BUỘC:
 1. Bạn PHẢI trả về ĐÚNG 1 ĐỐI TƯỢNG JSON (JSON Object) có duy nhất 1 key là "flashcards", giá trị là một mảng các đối tượng.
 2. Mỗi object trong mảng gồm đúng 2 khóa:
-   - "front": Khái niệm hoặc từ khóa cốt lõi (rất ngắn gọn, từ 1 đến 10 từ).
-   - "back": Định nghĩa, giải thích chi tiết, dễ hiểu (từ 1 đến 3 câu).
+   - "front": Khái niệm, từ khóa cốt lõi, hoặc câu hỏi (rất ngắn gọn, từ 1 đến 10 từ).
+   - "back": Định nghĩa, giải thích chi tiết, hoặc câu trả lời (từ 1 đến 3 câu).
 
 TÀI LIỆU CẦN XỬ LÝ:
 {text_content}
@@ -162,23 +159,6 @@ TÀI LIỆU CẦN XỬ LÝ:
     if not final_flashcards:
         raise ValueError("AI Model thất bại trong việc tạo Flashcard hợp lệ.")
 
-    # 4. Lưu Cache vào Qdrant
-    try:
-        if global_vector is not None:
-            point = PointStruct(
-                id=str(uuid.uuid4()),
-                vector=global_vector,
-                payload={
-                    "session_id": session_id,
-                    "document_id": document_id,
-                    "level": 3,
-                    "text_content": json.dumps(final_flashcards, ensure_ascii=False),
-                    "type": "flashcard"
-                }
-            )
-            qdrant_client.upsert(collection_name=QDRANT_COLLECTION_NAME, points=[point])
-            logger.info("Đã lưu cache Flashcards vào Qdrant thành công.")
-    except Exception as e:
-        logger.error(f"Không thể lưu flashcard vào Qdrant cache: {e}")
+    # 4. (Đã gỡ bỏ logic lưu Cache vào Qdrant. Java BE MySQL sẽ đảm nhận việc lưu trữ)
 
     return final_flashcards, total_tokens

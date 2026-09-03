@@ -1,0 +1,90 @@
+Dựa trên tài liệu "kinh te vi mo chuong 1-31trang.pdf", dưới đây là bản tóm tắt học thuật toàn diện về các nền tảng của Kinh tế học vĩ mô.
+
+### Khái quát chung về Kinh tế học
+
+* **Sự khan hiếm (Scarcity):** Khái niệm này đề cập đến tính hữu hạn của các nguồn lực trong xã hội. Kinh tế học chính là bộ môn khoa học nghiên cứu cách xã hội giải quyết vấn đề khan hiếm này, bao gồm các quyết định chi tiêu, tiết kiệm, phân bổ nguồn lực và tổ chức sản xuất.
+
+
+* **Phân nhánh và Cách tiếp cận:** Xét về phạm vi, kinh tế học được chia thành **Vi mô** (nghiên cứu quyết định của cá nhân, hộ gia đình, doanh nghiệp trên các thị trường cụ thể) và **Vĩ mô** (nghiên cứu tổng thể toàn bộ nền kinh tế). Về phương pháp tiếp cận, bộ môn này bao gồm **Kinh tế học thực chứng** (mô tả sự vận hành thực tế khách quan của thế giới) và **Kinh tế học chuẩn tắc** (đưa ra các nhận định, khuyến nghị chính sách).
+
+
+
+### Mười nguyên lý cơ bản của Kinh tế học
+
+| Nhóm nguyên lý | Nội dung nguyên lý |
+| --- | --- |
+| **Ra quyết định cá nhân** | **1. Đánh đổi:** Mọi quyết định đều đòi hỏi từ bỏ một lợi ích để đạt lợi ích khác.
+
+<br>
+
+<br>**2. Chi phí cơ hội:** Là giá trị của cơ hội tốt nhất bị từ bỏ khi ra quyết định.
+
+<br>
+
+<br>**3. Tư duy cận biên:** Quyết định hợp lý dựa trên việc so sánh chi phí và lợi ích cận biên.
+
+<br>
+
+<br>**4. Kích thích:** Cá nhân hành động dựa trên sự so sánh lợi ích trước các phần thưởng hoặc hình phạt.
+
+ |
+| **Tương tác kinh tế** | **5. Thương mại:** Sự chuyên môn hóa và trao đổi mang lại lợi ích cho mọi bên tham gia.
+
+<br>
+
+<br>**6. Vai trò của thị trường:** Là phương thức tối ưu để tổ chức các hoạt động kinh tế thông qua tương tác cung - cầu.
+
+<br>
+
+<br>**7. Vai trò của Chính phủ:** Có thể can thiệp để khắc phục sự thất bại của thị trường và nâng cao tính công bằng xã hội.
+
+ |
+| **Tổng thể nền kinh tế** | **8. Năng suất lao động:** Là yếu tố then chốt quyết định mức sống và năng lực sản xuất của một quốc gia.
+
+<br>
+
+<br>**9. Cung tiền và lạm phát:** Việc chính phủ in quá nhiều tiền tệ sẽ làm mất giá đồng tiền và trực tiếp gây ra lạm phát.
+
+<br>
+
+<br>**10. Đánh đổi ngắn hạn:** Nền kinh tế luôn phải đối mặt với sự đánh đổi nghịch biến giữa lạm phát và thất nghiệp trong ngắn hạn (biểu diễn qua đường cong Phillips).
+
+ |
+
+### Hệ thống và Đối tượng nghiên cứu Vĩ mô
+
+Hệ thống kinh tế vĩ mô vận hành dựa trên sự tương tác giữa **Tổng cung (AS)** (tổng khối lượng sản phẩm quốc dân mà các doanh nghiệp sản xuất và bán ra tương ứng với mức giá chung) và **Tổng cầu (AD)** (tổng khối lượng hàng hóa, dịch vụ mà các chủ thể sẵn sàng mua tại từng mức giá). Trạng thái lý tưởng đạt được tại **sản lượng cân bằng**, nơi lượng sản xuất đáp ứng vừa đủ nhu cầu tiêu dùng mà không gây dư thừa.
+
+Nghiên cứu vĩ mô tập trung vào bốn đối tượng cốt lõi:
+
+1. **Mức sản xuất:** Đo lường thông qua GDP nhằm đánh giá sự tăng trưởng kinh tế dài hạn và các chu kỳ kinh doanh ngắn hạn.
+
+
+2. **Thất nghiệp:** Nghiên cứu lực lượng lao động chưa có việc làm để đánh giá tác động và tìm kiếm biện pháp hạn chế.
+
+
+3. **Lạm phát:** Phân tích nguyên nhân và hệ quả của sự gia tăng mức giá chung liên tục nhằm xây dựng chính sách kiểm soát.
+
+
+4. **Cán cân thanh toán:** Thống kê các giao dịch kinh tế quốc tế để định duyệt sự biến động tài chính đối ngoại của nền kinh tế.
+
+
+
+### Các công cụ điều tiết Vĩ mô
+
+Nhằm duy trì sự ổn định, chính phủ vận dụng bốn nhóm công cụ chính:
+
+* **Chính sách tài khóa:** Điều chỉnh nguồn thu (thuế) và chi tiêu công nhằm định hướng nền kinh tế đạt mức sản lượng và việc làm mục tiêu.
+
+
+* **Chính sách tiền tệ:** Can thiệp vào cung tiền và lãi suất để điều tiết hoạt động đầu tư tư nhân, kiểm soát các biến số vĩ mô.
+
+
+* **Chính sách ngoại thương:** Vận dụng tỷ giá hối đoái, thuế quan và hạn ngạch để duy trì sự ổn định cho cán cân thanh toán.
+
+
+* **Chính sách thu nhập:** Thiết lập cơ chế kiểm soát trực tiếp đối với giá cả và tiền lương khi lạm phát có nguy cơ vượt khỏi tầm kiểm soát.
+
+
+
+Bạn có muốn tôi đi sâu phân tích thêm về cơ chế truyền dẫn của chính sách tài khóa hay chính sách tiền tệ không?
