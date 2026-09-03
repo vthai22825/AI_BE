@@ -20,27 +20,9 @@ def generate_mindmap(document_id: str, session_id: str, qdrant_client: QdrantCli
     Truy xuất mindmap từ bộ nhớ đệm (Qdrant). Nếu chưa có thì sinh bằng AI và lưu lại.
     Trả về chuỗi Markdown lồng nhau (tương thích markmap).
     """
-    # 1. Kiểm tra xem mindmap đã được lưu (cache) trong Qdrant chưa
-    try:
-        cached_results = qdrant_client.scroll(
-            collection_name=QDRANT_COLLECTION_NAME,
-            scroll_filter=Filter(
-                must=[
-                    FieldCondition(key="document_id", match=MatchValue(value=document_id)),
-                    FieldCondition(key="session_id", match=MatchValue(value=session_id)),
-                    FieldCondition(key="type", match=MatchValue(value="mindmap"))
-                ]
-            ),
-            limit=1
-        )
-        points = cached_results[0]
-        if points:
-            logger.info("Mindmap đã tồn tại trong database. Lấy từ cache...")
-            return points[0].payload.get("text_content", ""), 0
-    except Exception as e:
-        logger.warning(f"Lỗi khi check cache mindmap: {e}")
-
-    # 2. Nếu chưa có, lấy global_summary để tạo mindmap
+    # (Đã loại bỏ cơ chế lấy/cache từ Qdrant vì Java BE đã quản lý Mindmap bằng MySQL)
+    
+    # 1. Lấy global_summary để tạo mindmap
     text_content = ""
     try:
         results = qdrant_client.scroll(
