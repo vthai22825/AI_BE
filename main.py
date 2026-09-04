@@ -5,7 +5,7 @@ import PyPDF2
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from models.schemas import DocumentProcessResponse, ChatStreamRequest, FlashcardGenerateRequest
+from models.schemas import DocumentProcessResponse, ChatStreamRequest, FlashcardGenerateRequest, QuizGenerateRequest
 
 from services.ai_query import rag_query_stream
 from services.raptor_ingestion import raptor_ingest
@@ -143,6 +143,30 @@ def generate_flashcards_api(document_id: str, request: FlashcardGenerateRequest)
     except Exception as e:
         logger.error(f"Lỗi API Flashcard: {e}")
         raise HTTPException(status_code=500, detail=f"Lỗi hệ thống khi sinh flashcard: {str(e)}")
+
+@app.post("/api/documents/{document_id}/quiz", tags=["Document"])
+def generate_quiz_api(document_id: str, request: QuizGenerateRequest):
+    from services.quiz_service import generate_quiz
+    try:
+        qdrant_client = get_qdrant_client()
+        start_time = time.time()
+        quizzes, token_cost = generate_quiz(
+            document_id=document_id, 
+            session_id=request.session_id, 
+            number_of_questions=request.number_of_questions,
+            difficulty=request.difficulty,
+            topic=request.topic,
+            qdrant_client=qdrant_client
+        )
+        latency_ms = int((time.time() - start_time) * 1000)
+        user_id = request.session_id.split('_')[0] if '_' in request.session_id else "unknown"
+        log_event_async("INFO", user_id, "Generate Quiz", latency_ms, token_cost)
+        return {"status": "success", "quizzes": quizzes}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error(f"Lỗi API Quiz: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống khi sinh quiz: {str(e)}")
 
 @app.get("/api/documents/{document_id}/mindmap", tags=["Document"])
 def get_mindmap(document_id: str, session_id: str):

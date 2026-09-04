@@ -16,3 +16,9 @@ class FlashcardGenerateRequest(BaseModel):
     number_of_cards: str = "Tiêu chuẩn"
     difficulty: str = "Trung bình"
     topic: str = ""
+
+class QuizGenerateRequest(BaseModel):
+    session_id: str
+    number_of_questions: str = "Tiêu chuẩn"
+    difficulty: str = "Trung bình"
+    topic: str = ""
