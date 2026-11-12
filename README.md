@@ -38,24 +38,20 @@ AI_BE/
 
 Dưới đây là các tính năng cốt lõi được xây dựng và tích hợp hoàn chỉnh trong hệ thống:
 
-### 1. Quản lý Tài khoản & Workspace
-* **Xác thực JWT:** Đăng ký, đăng nhập an toàn, phân quyền người dùng thông qua Spring Security và Stateless JWT Token.
-* **Không gian làm việc (Workspace):** Cho phép người dùng tạo và quản lý các workspace riêng biệt để phân loại tài liệu theo môn học hoặc dự án.
-
-### 2. Xử lý tài liệu đa định dạng (Document Ingestion)
+### 1. Xử lý tài liệu đa định dạng (Document Ingestion)
 * **Hỗ trợ PDF & DOCX:** Xử lý file PDF (bóc tách theo trang vật lý) và DOCX (xử lý luồng văn bản liên tục bằng `RecursiveCharacterTextSplitter`).
 * **Lưu trữ đám mây:** Tự động đẩy tệp gốc lên Cloudflare R2 để lưu trữ an toàn và tối ưu tốc độ truy xuất.
 
-### 3. Kiến trúc tóm tắt phân cấp (RAPTOR Pipeline)
+### 2. Kiến trúc tóm tắt phân cấp (RAPTOR Pipeline)
 * **Phân mảnh & Gom cụm:** Chia văn bản thành Chunk Level 0, dùng thuật toán K-Means Clustering để gom nhóm cụm chủ đề và sinh Node Level 1.
 * **Tóm tắt toàn cục (Global Summary):** Tự động tạo bản tóm tắt toàn bộ tài liệu chạy ngầm ngay trong pha Ingestion (`Background Ingestion`), cache trực tiếp vào hệ thống để gọi lại tức thời.
 * **Lưu trữ Vector:** Toàn bộ cấu trúc đa tầng được nhúng qua mô hình BGE-M3 và lưu trữ vào Qdrant Vector DB (tổng cộng gần 500 vectors trong các bài test thực nghiệm).
 
-### 4. Hỏi đáp ngữ cảnh (RAG Chatbot & Citations)
+### 3. Hỏi đáp ngữ cảnh (RAG Chatbot & Citations)
 * **Truy xuất thông minh:** Tìm kiếm độ tương đồng Cosine trên Qdrant để lọc các đoạn ngữ cảnh sát với câu hỏi nhất.
 * **Chống ảo giác (Zero-Hallucination):** Dùng mô hình Gemini 3.7 Flash với tham số `temperature = 0.0` để đảm bảo AI trả lời đúng 100% dựa trên tài liệu, không tự bịa thông tin.
 * **Trích dẫn nguồn:** Mỗi câu trả lời đều đính kèm số trang/nguồn tài liệu gốc để người dùng dễ kiểm chứng.
 
-### 5. Công cụ hỗ trợ học tập
+### 4. Công cụ hỗ trợ học tập
 * **Sơ đồ tư duy (Mind Map):** Hiển thị bản tóm tắt toàn cục dạng cây phân cấp (từ RAPTOR), giúp nắm bắt tổng quan tài liệu nhanh chóng.
 * **Flashcards tự động:** Trích xuất các thuật ngữ và ý chính từ tài liệu để tạo bộ thẻ lật ôn tập kiến thức.
