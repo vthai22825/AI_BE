@@ -9,59 +9,85 @@ from config import (
     CHUNK_SIZE, 
     CHUNK_OVERLAP, 
     ensure_collection_exists, 
-    OLLAMA_SUMMARY_MODEL, 
-    GOOGLE_API_KEYS, 
-    QDRANT_COLLECTION_NAME,
-    GITHUB_API_KEY,
-    GITHUB_BASE_URL,
-    GITHUB_FALLBACK_MODELS
+    OPENROUTER_API_KEY, 
+    OPENROUTER_CHAT_MODEL,
+    OPENROUTER_EMBEDDING_MODEL,
+    OPENROUTER_BASE_URL,
+    QDRANT_COLLECTION_NAME
 )
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 
 logger = logging.getLogger(__name__)
 
-#embedding bằng mô hình nhúng của google
-if not GOOGLE_API_KEYS:
-    raise ValueError("Không tìm thấy GOOGLE_API_KEY nào trong cấu hình.")
-google_embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/gemini-embedding-2", 
-    google_api_key=GOOGLE_API_KEYS[0],
-    output_dimensionality=1536
+# embedding bằng mô hình nhúng của OpenRouter
+if not OPENROUTER_API_KEY:
+    raise ValueError("Không tìm thấy OPENROUTER_API_KEY trong cấu hình.")
+
+openrouter_embeddings = OpenAIEmbeddings(
+    model=OPENROUTER_EMBEDDING_MODEL, 
+    api_key=OPENROUTER_API_KEY,
+    base_url=OPENROUTER_BASE_URL,
+    chunk_size=1 # Bắt buộc là 1 vì BGE-M3 trên OpenRouter chỉ nhận string, không nhận array
 )
 
-def _embed_texts(chunks: list[str], batch_size: int =100)-> list[list[float]]:
-    #vì google limit bản free nên nhúng theo batch
+def _embed_texts(chunks: list[str], batch_size: int = 100) -> tuple[list[list[float]], int]:
+    # Thư viện Langchain luôn bọc chữ trong mảng ["text"] kể cả khi dùng embed_query
+    # Do đó ta dùng thư viện requests thuần tuý để đảm bảo gửi đúng định dạng string cho OpenRouter bge-m3
     all_vector = []
     total_chunks = len(chunks)
     if total_chunks == 0:
-        return []
-    for i in range(0, total_chunks, batch_size):
-        batch_chunks = chunks[i : i + batch_size]
-
-        try:
-            batch_vector = google_embeddings.embed_documents(batch_chunks)
-            all_vector.extend(batch_vector)
+        return [], 0
+        
+    logger.info(f"Đang tiến hành nhúng {total_chunks} đoạn văn bản (Direct HTTP Request)...")
+    try:
+        from concurrent.futures import ThreadPoolExecutor
+        import requests
+        
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        def get_embedding(chunk: str):
+            clean_chunk = chunk.strip()
+            if not clean_chunk:
+                clean_chunk = "[EMPTY_CONTENT]"
+                
+            payload = {
+                "model": OPENROUTER_EMBEDDING_MODEL,
+                "input": clean_chunk # Gửi ĐÚNG 1 string thuần, không bọc mảng
+            }
+            res = requests.post(f"{OPENROUTER_BASE_URL}/embeddings", headers=headers, json=payload)
+            if res.status_code != 200:
+                raise ValueError(f"OpenRouter API Error: {res.text}")
             
-            if i + batch_size < total_chunks:
-                time.sleep(1)
-        except Exception as e:
-            logger.error("Lỗi khi nhúng tại lô %d: %s", (i // batch_size) + 1, str(e))
-            raise e
-    return all_vector
+            data = res.json()
+            usage = data.get("usage", {}).get("total_tokens", 0)
+            return data["data"][0]["embedding"], usage
+            
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            results = list(executor.map(get_embedding, chunks))
+            all_vector = [r[0] for r in results]
+            total_tokens = sum(r[1] for r in results)
+            
+    except Exception as e:
+        logger.error(f"Lỗi khi nhúng văn bản qua HTTP: {str(e)}")
+        raise e
+        
+    return all_vector, total_tokens
 
 
-#hàm co cụm
-def _cluter_vertor(vectors: list[list[float]])-> np.ndarray:
-    #số lượng cụm là tổng vector chia 6 lấy phần nguyên (cân bằng tốc độ và chi tiết)
+# hàm co cụm
+def _cluter_vertor(vectors: list[list[float]]) -> np.ndarray:
+    # số lượng cụm là tổng vector chia 6 lấy phần nguyên (cân bằng tốc độ và chi tiết)
     n_samples = len(vectors)
     effective_clusters = max(1, n_samples // 6)
     from sklearn.cluster import KMeans
     kmeans = KMeans(n_clusters=effective_clusters, random_state=42, n_init="auto")
     return kmeans.fit_predict(np.array(vectors))
 
-def _summarize_cluster(items_in_cluster: list[dict]) -> str:
+def _summarize_cluster(items_in_cluster: list[dict]) -> tuple[str, int]:
     # Gộp văn bản kèm theo thông tin trang
     combined_text = ""
     for item in items_in_cluster:
@@ -81,26 +107,24 @@ Văn bản cần tóm tắt:
 {combined_text}"""
     
     try:
-        from langchain_ollama import ChatOllama
-        
-        logger.info(f"Đang tóm tắt bằng OLLAMA model: {OLLAMA_SUMMARY_MODEL}")
-        
-        llm = ChatOllama(
-            model=OLLAMA_SUMMARY_MODEL, 
-            temperature=0.3,      
-            num_predict=2048,      
-            timeout=120.0,         
+        llm = ChatOpenAI(
+            model=OPENROUTER_CHAT_MODEL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
+            temperature=0.2,      
+            max_retries=1
         )
             
         response = llm.invoke(prompt)
-        return response.content.strip()
+        usage = response.response_metadata.get("token_usage", {}).get("total_tokens", 0)
+        return response.content.strip(), usage
     
     except Exception as e:
-        logger.error(f"Ollama ({OLLAMA_SUMMARY_MODEL}) gặp lỗi khi tóm tắt: {e}")
-        return "Lỗi: Không thể tóm tắt đoạn văn bản này bằng AI nội bộ."
+        logger.error(f"OpenRouter ({OPENROUTER_CHAT_MODEL}) gặp lỗi khi tóm tắt: {e}")
+        return "Lỗi: Không thể tóm tắt đoạn văn bản này bằng AI.", 0
 
 
-def _generate_global_summary(parent_texts: list[str], parent_cited_pages: list[list[int]]) -> str:
+def _generate_global_summary(parent_texts: list[str], parent_cited_pages: list[list[int]]) -> tuple[str, int]:
     """Tóm tắt lại toàn bộ các parent_texts thành một Global Summary"""
     combined_text = ""
     for text, pages in zip(parent_texts, parent_cited_pages):
@@ -114,67 +138,46 @@ Dưới đây là các bản tóm tắt của từng phần trong một tài li�
 YÊU CẦU NGHIÊM NGẶT:
 1. TUYỆT ĐỐI TRUNG THÀNH VỚI VĂN BẢN: Không được tự ý sáng tạo, không chèn thêm bất kỳ kiến thức cá nhân nào.
 2. BẢO TOÀN THUẬT NGỮ: Không được khái quát hóa các danh sách quan trọng.
-3. TRÍCH DẪN TẠI CHỖ (INLINE CITATIONS): Khi bạn tóm tắt một ý hoặc một đoạn, BẮT BUỘC phải chèn một liên kết markdown trích dẫn nguồn trang ngay tại dòng đó (ở cuối câu hoặc đoạn). 
-Cú pháp trích dẫn BẮT BUỘC: `[Trang X](#page-X)` hoặc `[Trang X, Trang Y](#page-X)`
+3. TRÍCH DẪN (INLINE CITATIONS): BẮT BUỘC chèn thẻ trích dẫn dưới dạng Markdown link `[Trang X](#page-X)` vào văn bản. 
+- ĐỂ TRÁNH LẶP LẠI RỐI MẮT: Nếu nhiều câu liên tiếp hoặc một danh sách lấy từ CÙNG MỘT TRANG, CHỈ CẦN đặt 1 trích dẫn duy nhất ở cuối đoạn văn hoặc cuối danh sách. KHÔNG lặp lại trích dẫn ở mọi dòng.
 Ví dụ: "Hệ thống hỗ trợ tâm lý rất quan trọng đối với Thẩm phán [Trang 10](#page-10)."
-4. Trình bày cấu trúc rõ ràng (Sử dụng tiêu đề, danh sách gạch đầu dòng, bảng biểu nếu cần).
+4. Trình bày cấu trúc RẤT RÕ RÀNG VÀ THOÁNG ĐÃNG (ĐỂ HIỂN THỊ ĐẸP TRÊN UI):
+- BẮT BUỘC cách nhau bằng một DÒNG TRỐNG (blank line) giữa các đoạn văn, giữa các tiêu đề, và đặc biệt là giữa các mục trong danh sách gạch đầu dòng.
+- KHÔNG viết các đoạn văn quá dài (ríu chữ). Hãy ngắt thành các ý nhỏ và xuống dòng thường xuyên.
+- Sử dụng in đậm cho các từ khóa và tiêu đề phụ để tăng tính mạch lạc.
 
 Nội dung các phần:
 {combined_text}"""
     
     try:
-        from langchain_openai import ChatOpenAI
-        
-        # Thử sử dụng các Cloud Models (GPT-4o, Claude...)
-        if GITHUB_API_KEY:
-            for model_name in GITHUB_FALLBACK_MODELS:
-                try:
-                    logger.info("Đang sinh Global Summary bằng Cloud AI: %s...", model_name)
-                    llm = ChatOpenAI(
-                        model=model_name,
-                        api_key=GITHUB_API_KEY,
-                        base_url=GITHUB_BASE_URL,
-                        temperature=0.0, # Hạ nhiệt độ xuống 0.0 để tránh ảo giác
-                        max_retries=0
-                    )
-                    response = llm.invoke(prompt)
-                    return response.content.strip()
-                except Exception as e:
-                    logger.warning("Truy xuất qua %s thất bại: %s. Kích hoạt model dự phòng...", model_name, e)
-                    import asyncio
-                    # dùng time.sleep thay vì asyncio.sleep vì hàm này là đồng bộ (sync)
-                    time.sleep(1)
-            
-            logger.error("Đã thử toàn bộ Cloud Models nhưng đều thất bại. Quay về dùng Local AI.")
-        
-        # Nếu không có GITHUB_API_KEY hoặc tất cả cloud fail thì fallback về Ollama
-        from langchain_ollama import ChatOllama
-        logger.info(f"Đang sinh Global Summary bằng Local AI ({OLLAMA_SUMMARY_MODEL})...")
-        llm = ChatOllama(
-            model=OLLAMA_SUMMARY_MODEL, 
-            temperature=0.3,      
-            num_predict=4096,      
-            timeout=180.0,         
+        logger.info(f"Đang sinh Global Summary bằng OpenRouter Model: {OPENROUTER_CHAT_MODEL}...")
+        llm = ChatOpenAI(
+            model=OPENROUTER_CHAT_MODEL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
+            temperature=0.0, # Hạ nhiệt độ xuống 0.0 để tránh ảo giác
+            max_retries=1
         )
         response = llm.invoke(prompt)
-        return response.content.strip()
+        usage = response.response_metadata.get("token_usage", {}).get("total_tokens", 0)
+        return response.content.strip(), usage
         
     except Exception as e:
         logger.error(f"Lỗi khi sinh Global Summary: {e}")
-        return "Lỗi: Không thể tạo bản tóm tắt toàn cục."
+        return "Lỗi: Không thể tạo bản tóm tắt toàn cục.", 0
 
-#hàm thực thi raptor
-def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_client: QdrantClient)-> dict[str, Any]:
+# hàm thực thi raptor
+def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_client: QdrantClient) -> dict[str, Any]:
 
     from langchain_core.documents import Document
     docs = []
     for page in pages:
         docs.append(Document(page_content=page["text"], metadata={"page_number": page["page_number"]}))
 
-    #chunkings text thành các đoạn
+    # chunkings text thành các đoạn
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size = CHUNK_SIZE,
-        chunk_overlap = CHUNK_OVERLAP
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP
     )
     chunk_docs = text_splitter.split_documents(docs)
 
@@ -185,14 +188,16 @@ def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_c
     chunks = [doc.page_content for doc in chunk_docs]
     page_numbers = [doc.metadata.get("page_number", "N/A") for doc in chunk_docs]
     
-    #khởi tạo collection qdrant
+    # khởi tạo collection qdrant
     ensure_collection_exists(qdrant_client)
     from qdrant_client.http.models import PointStruct
     
-    #embedding chunks
-    leaf_vectors = _embed_texts(chunks)
+    total_tokens_used = 0
+    # embedding chunks
+    leaf_vectors, leaf_tokens = _embed_texts(chunks)
+    total_tokens_used += leaf_tokens
 
-    #clustering và tạo nút cha
+    # clustering và tạo nút cha
     labels = _cluter_vertor(leaf_vectors)
 
     cluster_map: dict[int, list[dict]] = {}
@@ -203,28 +208,47 @@ def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_c
             "page_number": page_numbers[idx]
         })
     
-    #summarize nút cha
+    # summarize nút cha bằng Đa luồng (Multi-threading)
     parent_texts = []
     parent_leaf_ids = []
     parent_cited_pages = []
     
-    for cluster_id, items in sorted(cluster_map.items()):
-        summary = _summarize_cluster(items)
-        parent_texts.append(summary)
-        
-        parent_leaf_ids.append([item["leaf_id"] for item in items])
-        # Lọc unique page_numbers (loại bỏ N/A)
-        pages = list(set([item["page_number"] for item in items if item["page_number"] != "N/A"]))
-        parent_cited_pages.append(pages)
+    logger.info(f"Đang tóm tắt {len(cluster_map)} cụm bằng OpenRouter ({OPENROUTER_CHAT_MODEL}) đa luồng...")
     
-    #embedding nút cha
-    parent_vectors = _embed_texts(parent_texts)
+    from concurrent.futures import ThreadPoolExecutor
+    
+    # Chạy song song các hàm tóm tắt
+    def process_cluster(cluster_id, items):
+        summary, tokens = _summarize_cluster(items)
+        leaf_ids = [item["leaf_id"] for item in items]
+        pages = list(set([item["page_number"] for item in items if item["page_number"] != "N/A"]))
+        return cluster_id, summary, leaf_ids, pages, tokens
 
-    #tạo global summary (level 2)
-    global_summary = _generate_global_summary(parent_texts, parent_cited_pages)
-    global_vector = _embed_texts([global_summary])[0]
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(process_cluster, c_id, items) for c_id, items in cluster_map.items()]
+        
+        # Lấy kết quả và sắp xếp lại theo cluster_id cho đồng bộ
+        results = [f.result() for f in futures]
+        results.sort(key=lambda x: x[0])
+        
+        for res in results:
+            parent_texts.append(res[1])
+            parent_leaf_ids.append(res[2])
+            parent_cited_pages.append(res[3])
+            total_tokens_used += res[4]
+    
+    # embedding nút cha
+    parent_vectors, parent_tokens = _embed_texts(parent_texts)
+    total_tokens_used += parent_tokens
 
-    #lưu vào trong qdrant
+    # tạo global summary (level 2)
+    global_summary, global_summary_tokens = _generate_global_summary(parent_texts, parent_cited_pages)
+    total_tokens_used += global_summary_tokens
+    
+    global_vector, global_vector_tokens = _embed_texts([global_summary])
+    total_tokens_used += global_vector_tokens
+
+    # lưu vào trong qdrant
     points = []
     for chunk, leaf_id, vector, page_num in zip(chunks, leaf_ids, leaf_vectors, page_numbers):
         points.append(PointStruct(
@@ -257,7 +281,7 @@ def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_c
     all_pages = list(set([p for p in page_numbers if p != "N/A"]))
     points.append(PointStruct(
         id=str(uuid.uuid4()), 
-        vector=global_vector, 
+        vector=global_vector[0] if len(global_vector) > 0 else [], 
         payload={
             "session_id": session_id, 
             "document_id": document_id, 
@@ -271,4 +295,9 @@ def raptor_ingest(pages: list[dict], document_id: str, session_id: str, qdrant_c
     qdrant_client.upsert(collection_name=QDRANT_COLLECTION_NAME, points=points)
 
     logger.info("Lưu vào database thành công")
-    return {"total_leaf_nodes": len(chunks), "total_parent_nodes": len(parent_texts), "has_global_summary": True}
+    return {
+        "total_leaf_nodes": len(leaf_ids),
+        "total_parent_nodes": len(parent_leaf_ids),
+        "total_tokens": total_tokens_used,
+        "has_global_summary": True
+    }

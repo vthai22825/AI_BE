@@ -1,0 +1,106 @@
+[
+    {
+        "filename": "GioithieuXSTK-15trang.pdf",
+        "pages": 15,
+        "process_time_seconds": 46.55,
+        "total_chunks": 15,
+        "total_clusters": 2,
+        "total_vectors": 18,
+        "rouge_scores": {
+            "rouge1_f1": 0.8201187565490744,
+            "rouge2_f1": 0.5396714435512059,
+            "rougeL_f1": 0.39538945162417044
+        }
+    },
+    {
+        "filename": "Java_T1_Chương 1 - Hương.pdf",
+        "pages": 17,
+        "process_time_seconds": 55.34,
+        "total_chunks": 17,
+        "total_clusters": 2,
+        "total_vectors": 20,
+        "rouge_scores": {
+            "rouge1_f1": 0.8203793231684642,
+            "rouge2_f1": 0.5909936732415334,
+            "rougeL_f1": 0.45295648940126443
+        }
+    },
+    {
+        "filename": "Khoa học đại cương.docx",
+        "pages": 1,
+        "process_time_seconds": 62.75,
+        "total_chunks": 83,
+        "total_clusters": 13,
+        "total_vectors": 97,
+        "rouge_scores": {
+            "rouge1_f1": 0.7770034843205575,
+            "rouge2_f1": 0.5937227550130776,
+            "rougeL_f1": 0.4268292682926829
+        }
+    },
+    {
+        "filename": "kinh te vi mo chuong 1-31trang.pdf",
+        "pages": 31,
+        "process_time_seconds": 50.3,
+        "total_chunks": 31,
+        "total_clusters": 5,
+        "total_vectors": 37,
+        "rouge_scores": {
+            "rouge1_f1": 0.7616155481324021,
+            "rouge2_f1": 0.5937405044059556,
+            "rougeL_f1": 0.4949893713938658
+        }
+    },
+    {
+        "filename": "Lịch sử văn minh thế giới.docx",
+        "pages": 1,
+        "process_time_seconds": 41.51,
+        "total_chunks": 70,
+        "total_clusters": 11,
+        "total_vectors": 82,
+        "rouge_scores": {
+            "rouge1_f1": 0.7753898019384745,
+            "rouge2_f1": 0.5896246309574019,
+            "rougeL_f1": 0.3860092709650232
+        }
+    },
+    {
+        "filename": "Sinh học đại cương.docx",
+        "pages": 1,
+        "process_time_seconds": 53.77,
+        "total_chunks": 85,
+        "total_clusters": 14,
+        "total_vectors": 100,
+        "rouge_scores": {
+            "rouge1_f1": 0.8027430415490118,
+            "rouge2_f1": 0.5910375454178443,
+            "rougeL_f1": 0.39693424768051633
+        }
+    },
+    {
+        "filename": "Tâm lý học đại cương.docx",
+        "pages": 1,
+        "process_time_seconds": 58.96,
+        "total_chunks": 86,
+        "total_clusters": 14,
+        "total_vectors": 101,
+        "rouge_scores": {
+            "rouge1_f1": 0.7063930544593527,
+            "rouge2_f1": 0.566350710900474,
+            "rougeL_f1": 0.409629044988161
+        }
+    },
+    {
+        "filename": "Đạo-đức-nghề-Thẩm-phan-tại-Việt-Nam.pdf",
+        "pages": 16,
+        "process_time_seconds": 84.99,
+        "total_chunks": 29,
+        "total_clusters": 4,
+        "total_vectors": 34,
+        "rouge_scores": {
+            "rouge1_f1": 0.8142677999163995,
+            "rouge2_f1": 0.6949128919860628,
+            "rougeL_f1": 0.4949143096001114
+        }
+    }
+]

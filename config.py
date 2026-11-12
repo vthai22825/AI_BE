@@ -10,49 +10,25 @@ load_dotenv()
 QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "")
 
 #vector local dùng để embedding
-EMBEDDING_MODEL : str = os.getenv("EMBEDDING_MODEL","")
-VECTOR_SIZE: int = 1536
+VECTOR_SIZE: int = 1024
 
 # ==========================================
-# 1. GITHUB MODELS CONFIG
+# OPENROUTER CONFIG
 # ==========================================
-GITHUB_API_KEY: str = os.getenv("GITHUB_API_KEY", "")
-GITHUB_BASE_URL: str = "https://models.inference.ai.azure.com"
+OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_CHAT_MODEL: str = os.getenv("OPENROUTER_CHAT_MODEL")
+OPENROUTER_EMBEDDING_MODEL: str = os.getenv("OPENROUTER_EMBEDDING_MODEL", "baai/bge-m3")
+OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
-GITHUB_FALLBACK_MODELS: list[str] = [
-    "gpt-4o",
-    "claude-3-5-sonnet",
-    "Meta-Llama-3.1-70B-Instruct",
-    "gpt-4o-mini"
-]
-
-# ==========================================
-# 2. GOOGLE GEMINI CONFIG
-# ==========================================
-GOOGLE_API_KEYS: list[str] = [
-    os.getenv("GOOGLE_API_KEY_1", ""),
-    os.getenv("GOOGLE_API_KEY_2", ""),
-    os.getenv("GOOGLE_API_KEY_3", "")
-]
-
-GOOGLE_API_KEYS = [key for key in GOOGLE_API_KEYS if key]
-
-FALLBACK_MODELS: list[str] = [
-    "gemini-2.5-pro",
-    "gemini-2.5-flash"
-]
-
-
-OLLAMA_SUMMARY_MODEL: str = os.getenv("OLLAMA_SUMMARY_MODEL","")
+_qdrant_client_instance = None
 
 #hàm khởi tạo qdrant database
 def get_qdrant_client() -> QdrantClient:
-    #khởi tạo qdrant db
-    db_path = os.path.join(os.getcwd(), "local_qdrant_db")
-
-    #khởi tạo client 
-    client = QdrantClient(path=db_path)
-    return client
+    global _qdrant_client_instance
+    if _qdrant_client_instance is None:
+        db_path = os.path.join(os.getcwd(), "local_qdrant_db")
+        _qdrant_client_instance = QdrantClient(path=db_path)
+    return _qdrant_client_instance
 
 #hàm khởi tạo collection (nếu chưa có)
 def ensure_collection_exists(client: QdrantClient) -> None:

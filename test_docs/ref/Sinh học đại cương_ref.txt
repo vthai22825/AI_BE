@@ -1,0 +1,82 @@
+### Cấu trúc Tế bào và Cơ sở Phân tử của Sự sống
+
+* **Tế bào:** Là đơn vị cơ bản cấu trúc nên sự sống, chứa đựng các bào quan thực hiện những chức năng chuyên biệt hóa tối đa.
+
+
+* **Đặc tính của sự sống:** Sự sống vận hành như một hệ thống mở, liên tục trao đổi vật chất và năng lượng với môi trường để duy trì trạng thái cân bằng động. Mọi sinh vật trên Trái Đất, dù cấu tạo đơn giản hay phức tạp, đều tuân theo các quy luật sinh hóa và tiến hóa nhất quán.
+
+
+
+| Thuật ngữ khoa học | Phát âm / Tên Latin | Định nghĩa & Vai trò Sinh học |
+| --- | --- | --- |
+| **Mitochondrion** | /ˌmaɪ.təˈkɒn.dri.ən/ | Ty thể: Bào quan chuyển hóa năng lượng, thực hiện hô hấp tế bào để sản sinh ATP.
+
+ |
+| **Chloroplast** | /ˈklɒr.ə.plɑːst/ | Lục lạp: Bào quan quang hợp ở thực vật, chứa hệ sắc tố diệp lục giúp hấp thụ ánh sáng.
+
+ |
+| **Ribosome** | /ˈraɪ.bə.səʊm/ | Bào quan không có màng bao bọc, đóng vai trò thực hiện dịch mã tổng hợp protein cho tế bào.
+
+ |
+
+### Chu trình Tế bào và Phân bào (Giảm phân)
+
+Việc quan sát chu trình giảm phân tế bào biểu mô dưới kính hiển vi cho thấy các đặc điểm hình thái và ý nghĩa thực tiễn sau:
+
+| Giai đoạn quan sát | Mô tả hình thái học NST dưới kính hiển vi | Kết luận thực tiễn |
+| --- | --- | --- |
+| **Kỳ đầu I (Prophase I)** | Nhiễm sắc thể kép đóng xoắn, xuất hiện hiện tượng tiếp hợp và trao đổi chéo.
+
+ | Quá trình trao đổi chéo tạo ra các biến dị tổ hợp mới.
+
+ |
+| **Kỳ giữa I (Metaphase I)** | Nhiễm sắc thể xếp song song thành hai hàng trên mặt phẳng xích đạo của tế bào.
+
+ | Tạo điều kiện cho các NST phân ly độc lập về 2 cực của tế bào.
+
+ |
+| **Kỳ cuối II (Telophase II)** | Bộ nhiễm sắc thể đơn giãn xoắn, màng nhân được tái hình thành rõ rệt.
+
+ | Kết quả tạo ra 4 tế bào giao tử đơn bội mang bộ NST (n).
+
+ |
+
+### Cơ chế Di truyền và Thuyết Tiến hóa
+
+* **Di truyền học cổ điển:** Học thuyết di truyền của Mendel đã đặt nền móng vững chắc cho việc hiểu cách thức các tính trạng được truyền đạt từ thế hệ này sang thế hệ khác.
+
+
+* **Di truyền học hiện đại:** Công nghệ sinh học hiện đại hứa hẹn mang lại những đột phá to lớn trong việc điều trị các bệnh di truyền thông qua liệu pháp chỉnh sửa gen.
+
+
+* **Thuyết Tiến hóa:** Thuyết tiến hóa bằng con đường chọn lọc tự nhiên của Charles Darwin là cơ sở cốt lõi giải thích xuất sắc tính đa dạng sinh học trên hành tinh.
+
+
+
+### Sinh thái học và Đa dạng Sinh học toàn cầu
+
+* **Động lực của Hệ sinh thái:** Hệ sinh thái duy trì được sự ổn định nhờ vào các vòng tuần hoàn vật chất và dòng năng lượng di chuyển qua các chuỗi thức ăn phức tạp.
+
+
+* **Quang hợp:** Là quá trình sống còn ở thực vật, giúp chuyển hóa năng lượng ánh sáng mặt trời thành năng lượng hóa học được lưu trữ trong các hợp chất hữu cơ.
+
+
+* **Bảo tồn và Ứng dụng:** Bảo vệ môi trường tự nhiên chính là bảo vệ mạng lưới sự sống mong manh mà con người chỉ là một mắt xích không thể tách rời trong đó. Nền tảng hiểu biết về sinh học cung cấp cơ sở giúp con người giải quyết các thách thức lớn toàn cầu về an ninh lương thực, y tế và bảo tồn đa dạng sinh học.
+
+
+
+| Chỉ số đo lường sinh thái | Công thức tính / Đơn vị | Ý nghĩa ứng dụng lâm sàng / sinh thái |
+| --- | --- | --- |
+| **Mật độ quần thể** | Cá thể / mét vuông (hoặc $m^3$)
+
+ | Đánh giá mức độ cạnh tranh tài nguyên sinh cảnh của các cá thể.
+
+ |
+| **Năng suất sinh học sơ cấp** | Gram/$m^2$/năm (biomass)
+
+ | Xác định mức năng lượng chuyển đổi gốc của hệ sinh thái.
+
+ |
+| **Chỉ số đa dạng Shannon-Wiener** | $H = - \sum (p_i \cdot \ln p_i)$<br> | Đánh giá độ phong phú loài và tính ổn định của quần xã sinh vật.
+
+ |

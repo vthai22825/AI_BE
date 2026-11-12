@@ -1,0 +1,82 @@
+Dưới đây là bản tóm tắt toàn diện về các nội dung chuyên môn thuộc học phần Xác suất Thống kê, được tổng hợp dựa trên tài liệu "GioithieuXSTK-15trang.pdf".
+
+### Xác suất và Biến ngẫu nhiên
+
+Nội dung này cung cấp nền tảng về tính toán khả năng xảy ra của các biến cố và nghiên cứu các đại lượng ngẫu nhiên.
+
+* **Xác suất cơ bản:** Tính toán khả năng xảy ra của các biến cố ngẫu nhiên trong một phép thử cụ thể, kết hợp với các xác suất điều kiện hoặc xác suất độc lập (ví dụ: tính xác suất để hạt giống nảy mầm sau khi được chọn ngẫu nhiên).
+
+
+* **Biến ngẫu nhiên:** Nghiên cứu các quy luật phân phối xác suất của một đại lượng ngẫu nhiên.
+* *Biến ngẫu nhiên rời rạc:* Thiết lập bảng phân phối xác suất cho một đại lượng nhận các giá trị rời rạc (ví dụ: số hạt đậu đỏ lấy ra từ hộp), từ đó tính toán các tham số đặc trưng như kỳ vọng (giá trị trung bình) và phương sai.
+
+
+* *Biến ngẫu nhiên liên tục (Phân phối chuẩn):* Ứng dụng quy luật phân phối chuẩn cho các dữ liệu thực tế (như trọng lượng gà có trung bình là $1,7~kg$ và độ lệch chuẩn $0,2~kg$) để tính xác suất một quan sát rơi vào một khoảng giá trị cụ thể, hoặc dự báo số lượng cá thể đạt tiêu chuẩn trong một mẫu có kích thước lớn.
+
+
+
+
+
+### Mở đầu về Thống kê và Ước lượng tham số
+
+Phần này tập trung vào kỹ năng thu thập, xử lý dữ liệu và sử dụng mẫu để suy diễn về các tham số của tổng thể.
+
+* **Thống kê mô tả:** Trình bày phương pháp thu thập và bố trí số liệu mẫu (ví dụ: điều tra năng suất của 200 thửa ruộng) nhằm đưa ra các đánh giá ban đầu về giá trị trung bình và quy luật phân bố của toàn bộ tổng thể.
+
+
+* **Ước lượng tham số:**
+* *Ước lượng giá trị trung bình:* Tìm ước lượng điểm và thiết lập khoảng tin cậy (ví dụ: độ tin cậy $90\%$) cho giá trị trung bình của tổng thể dựa trên dữ liệu mẫu.
+
+
+* *Ước lượng tỷ lệ:* Xác định khoảng tin cậy (ví dụ: độ tin cậy $95\%$) cho một đặc tính trong tổng thể (như tỷ lệ người dân phản đối một chính sách) dựa trên kích thước mẫu và số lượng quan sát có đặc tính đó.
+
+
+
+
+
+Dưới đây là một ví dụ về cách trình bày dữ liệu mẫu trong việc ước lượng năng suất lúa $X(t\hat{a}n/ha)$:
+
+| Năng suất $X(t\hat{a}n/ha)$ | 7,3 | 7,4 | 7,5 | 7,6 | 7,7 | 7,8 |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Số thửa** | 1 | 3 | 5 | 7 | 3 | 1 |
+
+### Kiểm định giả thuyết
+
+Kiểm định giả thuyết là quá trình sử dụng dữ liệu mẫu để ra quyết định chấp nhận hay bác bỏ một nhận định về tổng thể tại một mức ý nghĩa nhất định (thường sử dụng $\alpha = 0,05$ hoặc $5\%$). Các dạng bài toán kiểm định chính bao gồm:
+
+* **Kiểm định về giá trị trung bình:** Đánh giá xem giá trị trung bình của tổng thể có lớn hơn/nhỏ hơn/khác biệt so với một ngưỡng cụ thể nào đó hay không (ví dụ: năng suất trung bình có trên $7,5~t\hat{a}n/ha$ hay không).
+
+
+* **Kiểm định so sánh hai tỷ lệ:** Xem xét sự khác biệt mang tính thống kê về tỷ lệ của một đặc tính giữa hai nhóm đối tượng độc lập (ví dụ: so sánh tỷ lệ phản đối chính sách giữa nhóm tuổi $25-40$ và nhóm $41-65$).
+
+
+* **Kiểm định sự phù hợp của tỷ lệ nhiều thành phần:** Kiểm tra giả thuyết xem các thành phần trong một tổng thể có tuân theo một tỷ lệ phân bổ đã định trước hay không (ví dụ: tỷ lệ 3 loài cá trong ao nuôi có đúng là $5:3:2$ hay không).
+
+
+* **Kiểm định tính độc lập:** Xác định xem hai biến số định tính có mối liên hệ hoặc phụ thuộc vào nhau hay không.
+
+
+
+Bảng dữ liệu ví dụ về kiểm định tính độc lập giữa kết quả điều trị bệnh và hãng sản xuất thuốc:
+
+| Hãng sản xuất | Khỏi bệnh | Giảm bệnh | Không giảm bệnh |
+| --- | --- | --- | --- |
+| **Hãng A** | 190 | 20 | 10 |
+| **Hãng B** | 185 | 15 | 5 |
+
+### Tương quan và Hồi quy tuyến tính đơn
+
+Nội dung này hướng đến việc đánh giá và mô hình hóa mối quan hệ giữa hai đại lượng.
+
+* **Phân tích tương quan:** Xác định xem có tồn tại mối quan hệ (tương quan tuyến tính) giữa hai biến số (ví dụ: hàm lượng Vitamin C và thời gian bảo quản) hay không.
+
+
+* **Hồi quy tuyến tính đơn:** Nếu tồn tại tương quan, tiến hành ước lượng và thiết lập phương trình toán học mô tả mối quan hệ tuyến tính đó, giúp dự báo sự biến thiên của biến phụ thuộc dựa trên biến độc lập.
+
+
+
+Bảng dữ liệu minh họa mối quan hệ giữa thời gian và hàm lượng chất:
+
+| Thời gian bảo quản (ngày) | 0 | 7 | 14 | 21 | 28 |
+| --- | --- | --- | --- | --- | --- |
+| **Hàm lượng Vitamin C (mg/100g)** | 60 | 52 | 47 | 44 | 41 |
