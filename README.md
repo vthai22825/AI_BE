@@ -36,8 +36,26 @@ AI_BE/
 
 ## Các chức năng chính
 
-- **Xử lý và lập chỉ mục tài liệu (Document Ingestion):** Tiếp nhận file tài liệu từ `DATN-BE` (qua URL hoặc luồng dữ liệu), bóc tách nội dung văn bản, chia nhỏ thành các đoạn (chunking) và mã hóa thành vector bằng mô hình `BGE-M3` trước khi lưu trữ vào `Qdrant`.
-- **Tóm tắt tài liệu phân cấp (Hierarchical Summarization):** Xây dựng cây tóm tắt nhiều tầng theo kiến trúc RAPTOR (gom cụm các đoạn văn bản có ngữ nghĩa tương đồng và tóm tắt dần từ chi tiết lên tổng quan), giúp xử lý hiệu quả các tài liệu dài mà không bị mất ngữ cảnh.
-- **Tóm tắt cá nhân hóa theo người học:** Kết hợp cấu trúc cây tài liệu với trạng thái và lịch sử học tập của từng người dùng (do `DATN-BE` truyền sang) để điều chỉnh độ sâu, trọng tâm và cách diễn đạt của bản tóm tắt.
-- **Hỏi đáp trên tài liệu (RAG Q&A):** Truy xuất các đoạn văn bản và node tóm tắt liên quan nhất từ `Qdrant` dựa trên câu hỏi của người dùng, sau đó tổng hợp ngữ cảnh và gọi LLM (thông qua OpenRouter API) để sinh câu trả lời bám sát nội dung tài liệu.
-- **Cung cấp RESTful API giao tiếp liên dịch vụ:** Đóng gói toàn bộ luồng xử lý thành các endpoint chuẩn JSON (tài liệu hóa tự động qua Swagger UI) để `DATN-BE` gọi bất đồng bộ hoặc đồng bộ tùy theo tác vụ.
+Dưới đây là các tính năng cốt lõi được xây dựng và tích hợp hoàn chỉnh trong hệ thống:
+
+### 1. Quản lý Tài khoản & Workspace
+* **Xác thực JWT:** Đăng ký, đăng nhập an toàn, phân quyền người dùng thông qua Spring Security và Stateless JWT Token.
+* **Không gian làm việc (Workspace):** Cho phép người dùng tạo và quản lý các workspace riêng biệt để phân loại tài liệu theo môn học hoặc dự án.
+
+### 2. Xử lý tài liệu đa định dạng (Document Ingestion)
+* **Hỗ trợ PDF & DOCX:** Xử lý file PDF (bóc tách theo trang vật lý) và DOCX (xử lý luồng văn bản liên tục bằng `RecursiveCharacterTextSplitter`).
+* **Lưu trữ đám mây:** Tự động đẩy tệp gốc lên Cloudflare R2 để lưu trữ an toàn và tối ưu tốc độ truy xuất.
+
+### 3. Kiến trúc tóm tắt phân cấp (RAPTOR Pipeline)
+* **Phân mảnh & Gom cụm:** Chia văn bản thành Chunk Level 0, dùng thuật toán K-Means Clustering để gom nhóm cụm chủ đề và sinh Node Level 1.
+* **Tóm tắt toàn cục (Global Summary):** Tự động tạo bản tóm tắt toàn bộ tài liệu chạy ngầm ngay trong pha Ingestion (`Background Ingestion`), cache trực tiếp vào hệ thống để gọi lại tức thời.
+* **Lưu trữ Vector:** Toàn bộ cấu trúc đa tầng được nhúng qua mô hình BGE-M3 và lưu trữ vào Qdrant Vector DB (tổng cộng gần 500 vectors trong các bài test thực nghiệm).
+
+### 4. Hỏi đáp ngữ cảnh (RAG Chatbot & Citations)
+* **Truy xuất thông minh:** Tìm kiếm độ tương đồng Cosine trên Qdrant để lọc các đoạn ngữ cảnh sát với câu hỏi nhất.
+* **Chống ảo giác (Zero-Hallucination):** Dùng mô hình Gemini 3.7 Flash với tham số `temperature = 0.0` để đảm bảo AI trả lời đúng 100% dựa trên tài liệu, không tự bịa thông tin.
+* **Trích dẫn nguồn:** Mỗi câu trả lời đều đính kèm số trang/nguồn tài liệu gốc để người dùng dễ kiểm chứng.
+
+### 5. Công cụ hỗ trợ học tập
+* **Sơ đồ tư duy (Mind Map):** Hiển thị bản tóm tắt toàn cục dạng cây phân cấp (từ RAPTOR), giúp nắm bắt tổng quan tài liệu nhanh chóng.
+* **Flashcards tự động:** Trích xuất các thuật ngữ và ý chính từ tài liệu để tạo bộ thẻ lật ôn tập kiến thức.
