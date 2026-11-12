@@ -21,7 +21,7 @@ Link 2 repo còn lại:
 * **Giao tiếp:** RESTful API (JSON)
 
 ## Cấu trúc thư mục
-
+```text
 AI_BE/
 ├── app/
 │   ├── api/          # Định nghĩa các endpoint RESTful API
@@ -32,6 +32,7 @@ AI_BE/
 ├── main.py           # File khởi chạy ứng dụng
 ├── requirements.txt  # Danh sách thư viện cần cài đặt
 └── .env.example      # Mẫu cấu hình biến môi trường
+```
 
 ## Các chức năng chính
 
